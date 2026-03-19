@@ -2478,41 +2478,52 @@ BotaoFlutuar = {
     end
 },
 BotaoGravidadeZero = {
-    Nome = "Zero gravity",
+    Nome = "Zero Gravity",
     IsToggle = true,
     Repeat = false,
 
     Script = function(state)
         local player = game.Players.LocalPlayer
         local character = player.Character or player.CharacterAdded:Wait()
+        local humanoid = character:WaitForChild("Humanoid")
         local root = character:WaitForChild("HumanoidRootPart")
 
-        -- cria força contra gravidade
+        -- salvar valores originais
+        if BotaoGravidadeZero.originalJump == nil then
+            BotaoGravidadeZero.originalJump = humanoid.JumpPower
+        end
+
         if state then
-            if not root:FindFirstChild("ZeroGravityForce") then
+            -- 🌙 pulo mais alto
+            humanoid.JumpPower = BotaoGravidadeZero.originalJump * 1.5
+
+            -- 🌙 queda lenta (força pra cima)
+            if not root:FindFirstChild("MoonForce") then
                 local force = Instance.new("VectorForce")
-                force.Name = "ZeroGravityForce"
+                force.Name = "MoonForce"
 
                 local attachment = Instance.new("Attachment")
+                attachment.Name = "MoonAttachment"
                 attachment.Parent = root
 
                 force.Attachment0 = attachment
                 force.RelativeTo = Enum.ActuatorRelativeTo.World
                 force.Parent = root
 
-                -- força = massa * gravidade
-                force.Force = Vector3.new(0, workspace.Gravity * root.AssemblyMass, 0)
-            end
-        else
-            local existing = root:FindFirstChild("ZeroGravityForce")
-            if existing then
-                existing:Destroy()
+                -- cancela parte da gravidade (não tudo!)
+                force.Force = Vector3.new(0, workspace.Gravity * root.AssemblyMass * 0.7, 0)
             end
 
-            local att = root:FindFirstChildOfClass("Attachment")
-            if att then
-                att:Destroy()
-            end
+        else
+            -- restaurar pulo
+            humanoid.JumpPower = BotaoGravidadeZero.originalJump or 50
+
+            -- remover força
+            local force = root:FindFirstChild("MoonForce")
+            if force then force:Destroy() end
+
+            local att = root:FindFirstChild("MoonAttachment")
+            if att then att:Destroy() end
         end
     end
 },
