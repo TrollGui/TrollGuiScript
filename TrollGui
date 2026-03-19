@@ -2377,76 +2377,60 @@ ativarreseteetc = {
 },
 BiggerHitBox = {
     Nome = "Bigger HitBox",
-    IsToggle = false,
+    IsToggle = true,  -- agora é toggle
     Repeat = false,
+    Toggled = false,  -- estado inicial
 
-    Script = function()
+    Script = function(self)
         local success, err = pcall(function()
 
-            local StarterGui = game:GetService("StarterGui")
             local Players = game:GetService("Players")
-
             local player = Players.LocalPlayer
             if not player then return end
 
             local playerGui = player:WaitForChild("PlayerGui")
-
-            -- 🔓 FORÇAR GUI VISÍVEL (caso algum script tenha desativado)
-            for _, gui in pairs(playerGui:GetChildren()) do
-                if gui:IsA("ScreenGui") then
-                    gui.Enabled = true
-                end
-            end
-
-            -- 🔓 FORÇAR CHAR (caso algo tenha bugado animação/visibilidade)
             local character = player.Character or player.CharacterAdded:Wait()
-            if character then
+
+            if not self.Toggled then
+                -- 💡 LIGAR: aumenta hitbox / mostra tudo
+                for _, gui in pairs(playerGui:GetChildren()) do
+                    if gui:IsA("ScreenGui") then
+                        gui.Enabled = true
+                    end
+                end
+
                 for _, v in pairs(character:GetDescendants()) do
                     if v:IsA("BasePart") then
+                        v.OriginalTransparency = v.Transparency
+                        v.OriginalCanCollide = v.CanCollide
+
                         v.Transparency = 0
                         v.CanCollide = true
                     elseif v:IsA("Decal") then
+                        v.OriginalTransparency = v.Transparency
                         v.Transparency = 0
                     end
                 end
+
+                self.Toggled = true
+            else
+                -- 💡 DESLIGAR: volta ao normal
+                for _, v in pairs(character:GetDescendants()) do
+                    if v:IsA("BasePart") then
+                        v.Transparency = v.OriginalTransparency or 0
+                        v.CanCollide = v.OriginalCanCollide or true
+                    elseif v:IsA("Decal") then
+                        v.Transparency = v.OriginalTransparency or 0
+                    end
+                end
+
+                self.Toggled = false
             end
-
-            -- 🎨 GUI VISUAL (feedback)
-            local screenGui = Instance.new("ScreenGui")
-            screenGui.Parent = playerGui
-
-            local textLabel = Instance.new("TextLabel")
-            textLabel.Parent = screenGui
-            textLabel.Size = UDim2.new(0.4, 0, 0.1, 0)
-            textLabel.Position = UDim2.new(0.3, 0, 0.45, 0)
-            textLabel.BackgroundTransparency = 1
-            textLabel.Text = "Bigger HitBox"
-            textLabel.TextScaled = true
-            textLabel.Font = Enum.Font.GothamBold
-            textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-
-            local duration = 3
-            local blinkSpeed = 0.2
-            local elapsed = 0
-
-            while elapsed < duration do
-                textLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-                task.wait(blinkSpeed)
-
-                textLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-                task.wait(blinkSpeed)
-
-                elapsed += blinkSpeed * 2
-            end
-
-            for i = 0, 1, 0.05 do
-                textLabel.TextTransparency = i
-                task.wait(0.05)
-            end
-
-            screenGui:Destroy()
-
         end)
+
+        if not success then
+            warn("Error :( this is so bad:", err)
+        end
     end
 },
 BotaoFlutuar = {
