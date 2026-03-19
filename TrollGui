@@ -2303,7 +2303,7 @@ drag(aa.PopupFrame)
         end
     },
 ativarreseteetc = {
-    Nome = "Unblock reset/inventory etc...",
+    Nome = "Unblock all",
     IsToggle = false,
     Repeat = false,
 
@@ -2334,19 +2334,6 @@ ativarreseteetc = {
             for _, gui in pairs(playerGui:GetChildren()) do
                 if gui:IsA("ScreenGui") then
                     gui.Enabled = true
-                end
-            end
-
-            -- 🔓 FORÇAR CHAR (caso algo tenha bugado animação/visibilidade)
-            local character = player.Character or player.CharacterAdded:Wait()
-            if character then
-                for _, v in pairs(character:GetDescendants()) do
-                    if v:IsA("BasePart") then
-                        v.Transparency = 0
-                        v.CanCollide = true
-                    elseif v:IsA("Decal") then
-                        v.Transparency = 0
-                    end
                 end
             end
 
@@ -2386,9 +2373,218 @@ ativarreseteetc = {
             screenGui:Destroy()
 
         end)
+    end
+},
+BiggerHitBox = {
+    Nome = "Bigger HitBox",
+    IsToggle = false,
+    Repeat = false,
 
-        if not success then
-		print("oh nooo")
+    Script = function()
+        local success, err = pcall(function()
+
+            local StarterGui = game:GetService("StarterGui")
+            local Players = game:GetService("Players")
+
+            local player = Players.LocalPlayer
+            if not player then return end
+
+            local playerGui = player:WaitForChild("PlayerGui")
+
+            -- 🔓 FORÇAR GUI VISÍVEL (caso algum script tenha desativado)
+            for _, gui in pairs(playerGui:GetChildren()) do
+                if gui:IsA("ScreenGui") then
+                    gui.Enabled = true
+                end
+            end
+
+            -- 🔓 FORÇAR CHAR (caso algo tenha bugado animação/visibilidade)
+            local character = player.Character or player.CharacterAdded:Wait()
+            if character then
+                for _, v in pairs(character:GetDescendants()) do
+                    if v:IsA("BasePart") then
+                        v.Transparency = 0
+                        v.CanCollide = true
+                    elseif v:IsA("Decal") then
+                        v.Transparency = 0
+                    end
+                end
+            end
+
+            -- 🎨 GUI VISUAL (feedback)
+            local screenGui = Instance.new("ScreenGui")
+            screenGui.Parent = playerGui
+
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Parent = screenGui
+            textLabel.Size = UDim2.new(0.4, 0, 0.1, 0)
+            textLabel.Position = UDim2.new(0.3, 0, 0.45, 0)
+            textLabel.BackgroundTransparency = 1
+            textLabel.Text = "Bigger HitBox"
+            textLabel.TextScaled = true
+            textLabel.Font = Enum.Font.GothamBold
+            textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+
+            local duration = 3
+            local blinkSpeed = 0.2
+            local elapsed = 0
+
+            while elapsed < duration do
+                textLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                task.wait(blinkSpeed)
+
+                textLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                task.wait(blinkSpeed)
+
+                elapsed += blinkSpeed * 2
+            end
+
+            for i = 0, 1, 0.05 do
+                textLabel.TextTransparency = i
+                task.wait(0.05)
+            end
+
+            screenGui:Destroy()
+
+        end)
+    end
+},
+BotaoFlutuar = {
+    Nome = "float",
+    IsToggle = true,
+    Repeat = false,
+    Script = function(state)  -- state = true (on) / false (off)
+        local player = game.Players.LocalPlayer
+        local character = player.Character
+        if not character then return end
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        if state then
+            -- Criar BodyPosition para flutuar
+            local bp = Instance.new("BodyPosition")
+            bp.Name = "FlutuacaoBP"
+            bp.Position = hrp.Position + Vector3.new(0, 5, 0) -- flutua 5 studs acima
+            bp.MaxForce = Vector3.new(400000, 400000, 400000)
+            bp.D = 10
+            bp.Parent = hrp
+        else
+            -- Remover BodyPosition
+            local bp = hrp:FindFirstChild("FlutuacaoBP")
+            if bp then
+                bp:Destroy()
+            end
+        end
+    end
+},
+BotaoGravidadeZero = {
+    Nome = "Zero gravity",
+    IsToggle = true,
+    Repeat = false,
+    Script = function(state)  -- state = true (on) / false (off)
+        local player = game.Players.LocalPlayer
+        local character = player.Character
+        if not character then return end
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        if state then
+            -- Criar BodyForce para anular gravidade
+            local bf = Instance.new("BodyForce")
+            bf.Name = "GravidadeZeroBF"
+            bf.Force = Vector3.new(0, workspace.Gravity * hrp:GetMass(), 0) -- cancela a gravidade
+            bf.Parent = hrp
+        else
+            -- Remover BodyForce
+            local bf = hrp:FindFirstChild("GravidadeZeroBF")
+            if bf then
+                bf:Destroy()
+            end
+        end
+    end
+},
+BetaMode = {
+    Nome = "Beta Mode",
+    IsToggle = true,
+    Repeat = false,
+
+    Script = function(state)
+        local Players = game:GetService("Players")
+        local RunService = game:GetService("RunService")
+
+        local player = Players.LocalPlayer
+
+        getgenv()._BetaMode = getgenv()._BetaMode or {}
+        local beta = getgenv()._BetaMode
+
+        local SPEED_MULT = 0.5  -- metade da velocidade, animações lentas
+
+        local function setupCharacter(char)
+            beta.Character = char
+            beta.Humanoid = char:WaitForChild("Humanoid")
+            beta.Animator = beta.Humanoid:WaitForChild("Animator")
+        end
+
+        if state then
+            if beta.Connection then return end
+
+            setupCharacter(player.Character or player.CharacterAdded:Wait())
+
+            beta.OriginalSpeeds = {}
+
+            -- desacelera TODAS as animações atuais
+            for _, track in ipairs(beta.Animator:GetPlayingAnimationTracks()) do
+                if not beta.OriginalSpeeds[track] then
+                    beta.OriginalSpeeds[track] = track.Speed
+                end
+                track:AdjustSpeed(SPEED_MULT)
+            end
+
+            -- mantém desacelerado + pega animações novas
+            beta.Connection = RunService.Heartbeat:Connect(function()
+                if not beta.Animator then return end
+
+                for _, track in ipairs(beta.Animator:GetPlayingAnimationTracks()) do
+                    if not beta.OriginalSpeeds[track] then
+                        beta.OriginalSpeeds[track] = track.Speed
+                    end
+                    track:AdjustSpeed(SPEED_MULT)
+                end
+            end)
+
+            -- reaplica ao respawn
+            beta.CharConn = player.CharacterAdded:Connect(function(char)
+                task.wait(0.2)
+                setupCharacter(char)
+            end)
+
+            print(">> Beta Mode ATIVADO")
+
+        else
+            -- restaurar TODAS as velocidades
+            if beta.OriginalSpeeds then
+                for track, speed in pairs(beta.OriginalSpeeds) do
+                    if track then
+                        pcall(function()
+                            track:AdjustSpeed(speed)
+                        end)
+                    end
+                end
+            end
+
+            beta.OriginalSpeeds = {}
+
+            if beta.Connection then
+                beta.Connection:Disconnect()
+                beta.Connection = nil
+            end
+
+            if beta.CharConn then
+                beta.CharConn:Disconnect()
+                beta.CharConn = nil
+            end
+
+            print(">> Beta Mode DESATIVADO")
         end
     end
 },
