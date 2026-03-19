@@ -2483,57 +2483,37 @@ BotaoGravidadeZero = {
     Repeat = false,
 
     Script = function(state)
-        print("Botão Moon gravity:", state) -- DEBUG
+        print("Estado recebido:", state) -- debug
 
         local player = game:GetService("Players").LocalPlayer
         if not player then return end
 
-        local character = player.Character
-        if not character then return end
-
+        local character = player.Character or player.CharacterAdded:Wait()
         local humanoid = character:FindFirstChildOfClass("Humanoid")
-        local root = character:FindFirstChild("HumanoidRootPart")
+        if not humanoid then return end
 
-        if not humanoid or not root then
-            warn("Personagem não carregado ainda")
-            return
+        -- salvar valores originais
+        if BotaoGravidadeZero.originalGravity == nil then
+            BotaoGravidadeZero.originalGravity = workspace.Gravity
         end
 
-        -- salvar original
         if BotaoGravidadeZero.originalJump == nil then
             BotaoGravidadeZero.originalJump = humanoid.JumpPower
         end
 
-        if state == true then
+        -- 🔥 ATIVAR
+        if state == "on" then
             print("ATIVANDO")
 
-            humanoid.JumpPower = BotaoGravidadeZero.originalJump * 1.5
+            workspace.Gravity = BotaoGravidadeZero.originalGravity * 0.5 -- gravidade menor
+            humanoid.JumpPower = BotaoGravidadeZero.originalJump * 1.5 -- pulo maior
 
-            if not root:FindFirstChild("MoonForce") then
-                local attachment = Instance.new("Attachment")
-                attachment.Name = "MoonAttachment"
-                attachment.Parent = root
-
-                local force = Instance.new("VectorForce")
-                force.Name = "MoonForce"
-                force.Attachment0 = attachment
-                force.RelativeTo = Enum.ActuatorRelativeTo.World
-                force.ApplyAtCenterOfMass = true
-                force.Parent = root
-
-                force.Force = Vector3.new(0, workspace.Gravity * root.AssemblyMass * 0.7, 0)
-            end
-
-        else
+        -- 🔥 DESATIVAR
+        elseif state == "off" then
             print("DESATIVANDO")
 
+            workspace.Gravity = BotaoGravidadeZero.originalGravity or 196.2
             humanoid.JumpPower = BotaoGravidadeZero.originalJump or 50
-
-            local force = root:FindFirstChild("MoonForce")
-            if force then force:Destroy() end
-
-            local att = root:FindFirstChild("MoonAttachment")
-            if att then att:Destroy() end
         end
     end
 },
