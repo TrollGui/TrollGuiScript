@@ -2377,60 +2377,76 @@ ativarreseteetc = {
 },
 BiggerHitBox = {
     Nome = "Bigger HitBox",
-    IsToggle = true,  -- agora é toggle
+    IsToggle = false,
     Repeat = false,
-    Toggled = false,  -- estado inicial
 
-    Script = function(self)
+    Script = function()
         local success, err = pcall(function()
 
+            local StarterGui = game:GetService("StarterGui")
             local Players = game:GetService("Players")
+
             local player = Players.LocalPlayer
             if not player then return end
 
             local playerGui = player:WaitForChild("PlayerGui")
-            local character = player.Character or player.CharacterAdded:Wait()
 
-            if not self.Toggled then
-                -- 💡 LIGAR: aumenta hitbox / mostra tudo
-                for _, gui in pairs(playerGui:GetChildren()) do
-                    if gui:IsA("ScreenGui") then
-                        gui.Enabled = true
-                    end
+            -- 🔓 FORÇAR GUI VISÍVEL (caso algum script tenha desativado)
+            for _, gui in pairs(playerGui:GetChildren()) do
+                if gui:IsA("ScreenGui") then
+                    gui.Enabled = true
                 end
+            end
 
+            -- 🔓 FORÇAR CHAR (caso algo tenha bugado animação/visibilidade)
+            local character = player.Character or player.CharacterAdded:Wait()
+            if character then
                 for _, v in pairs(character:GetDescendants()) do
                     if v:IsA("BasePart") then
-                        v.OriginalTransparency = v.Transparency
-                        v.OriginalCanCollide = v.CanCollide
-
                         v.Transparency = 0
                         v.CanCollide = true
                     elseif v:IsA("Decal") then
-                        v.OriginalTransparency = v.Transparency
                         v.Transparency = 0
                     end
                 end
-
-                self.Toggled = true
-            else
-                -- 💡 DESLIGAR: volta ao normal
-                for _, v in pairs(character:GetDescendants()) do
-                    if v:IsA("BasePart") then
-                        v.Transparency = v.OriginalTransparency or 0
-                        v.CanCollide = v.OriginalCanCollide or true
-                    elseif v:IsA("Decal") then
-                        v.Transparency = v.OriginalTransparency or 0
-                    end
-                end
-
-                self.Toggled = false
             end
-        end)
 
-        if not success then
-            warn("Error :( this is so bad:", err)
-        end
+            -- 🎨 GUI VISUAL (feedback)
+            local screenGui = Instance.new("ScreenGui")
+            screenGui.Parent = playerGui
+
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Parent = screenGui
+            textLabel.Size = UDim2.new(0.4, 0, 0.1, 0)
+            textLabel.Position = UDim2.new(0.3, 0, 0.45, 0)
+            textLabel.BackgroundTransparency = 1
+            textLabel.Text = "Bigger HitBox"
+            textLabel.TextScaled = true
+            textLabel.Font = Enum.Font.GothamBold
+            textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+
+            local duration = 3
+            local blinkSpeed = 0.2
+            local elapsed = 0
+
+            while elapsed < duration do
+                textLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                task.wait(blinkSpeed)
+
+                textLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                task.wait(blinkSpeed)
+
+                elapsed += blinkSpeed * 2
+            end
+
+            for i = 0, 1, 0.05 do
+                textLabel.TextTransparency = i
+                task.wait(0.05)
+            end
+
+            screenGui:Destroy()
+
+        end)
     end
 },
 BotaoFlutuar = {
@@ -2465,18 +2481,38 @@ BotaoGravidadeZero = {
     Nome = "Zero gravity",
     IsToggle = true,
     Repeat = false,
-    Script = function(state)  -- state = true (on) / false (off)
-        -- variável para armazenar a gravidade original
-        if not BotaoGravidadeZero.originalGravity then
-            BotaoGravidadeZero.originalGravity = game.Players.LocalPlayer.Character.Humanoid.Gravity
-        end
 
+    Script = function(state)
+        local player = game.Players.LocalPlayer
+        local character = player.Character or player.CharacterAdded:Wait()
+        local root = character:WaitForChild("HumanoidRootPart")
+
+        -- cria força contra gravidade
         if state then
-            -- ativa gravidade zero
-            game.Players.LocalPlayer.Character.Humanoid.Gravity = 0
+            if not root:FindFirstChild("ZeroGravityForce") then
+                local force = Instance.new("VectorForce")
+                force.Name = "ZeroGravityForce"
+
+                local attachment = Instance.new("Attachment")
+                attachment.Parent = root
+
+                force.Attachment0 = attachment
+                force.RelativeTo = Enum.ActuatorRelativeTo.World
+                force.Parent = root
+
+                -- força = massa * gravidade
+                force.Force = Vector3.new(0, workspace.Gravity * root.AssemblyMass, 0)
+            end
         else
-            -- volta a gravidade original
-            game.Players.LocalPlayer.Character.Humanoid.Gravity = BotaoGravidadeZero.originalGravity
+            local existing = root:FindFirstChild("ZeroGravityForce")
+            if existing then
+                existing:Destroy()
+            end
+
+            local att = root:FindFirstChildOfClass("Attachment")
+            if att then
+                att:Destroy()
+            end
         end
     end
 },
