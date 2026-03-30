@@ -55,7 +55,6 @@ local Buttons = {
         end
 
         if state then
-            print("FullBright ENABLED")
             getgenv().FullBright.Enabled = true
 
             -- force every frame (anti game override)
@@ -81,7 +80,6 @@ local Buttons = {
             end)
 
         else
-            print("FullBright DISABLED")
             getgenv().FullBright.Enabled = false
 
             if getgenv().FullBright.Conn then
@@ -282,7 +280,6 @@ BotaoComumente = {
             cam.CameraType = Enum.CameraType.Custom
             uis.MouseBehavior = Enum.MouseBehavior.LockCenter
 
-            print(">> FIRST PERSON FIX ATIVADO")
         else
             -- DESATIVAR E RESTAURAR CONFIGURAÇÕES
             player.CameraMode = getgenv().OriginalCameraSettings.CameraMode
@@ -316,7 +313,6 @@ BotaoCapitalista = {
                         local target = mouse.Target
                         if target and target:IsA("BasePart") then
                             target:Destroy()
-                            print(">> Parte deletada:", target.Name)
                         end
                     end
                 end
@@ -327,9 +323,9 @@ BotaoCapitalista = {
         getgenv().DeletePartModeState = state
 
         if state then
-            print(">> MODO DELETAR ATIVADO (pressione X para deletar partes)")
+            -- Modo ativado
         else
-            print(">> MODO DELETAR DESATIVADO")
+            -- Modo desativado
         end
     end
 },
@@ -405,12 +401,10 @@ MeuBotaoExtra = {
 
         if state then
             -- LIGAR
-            print("SPIN FLING LIGADO")
 
             -- obter hrp e armazenar
             local hrp, char = getHRP()
             if not hrp then
-                warn("Não foi possível obter HumanoidRootPart.")
                 return
             end
             getgenv().SpinFlingData.HRP = hrp
@@ -478,7 +472,6 @@ MeuBotaoExtra = {
 
         else
             -- DESLIGAR
-            print("SPIN FLING DESLIGADO")
 
             -- desconectar touched
             if getgenv().SpinFlingData.TouchedConnection then
@@ -768,7 +761,6 @@ NoclipButton = {
 
         -- STATE action
         if state then
-            print(">> [Noclip] ATIVADO")
             char = player.Character or player.CharacterAdded:Wait()
             backupCollisionsOnce()
 
@@ -785,7 +777,6 @@ NoclipButton = {
             end)
 
         else
-            print(">> [Noclip] DESATIVADO")
             -- desconectar loop
             if getgenv().NoclipData.Conn then
                 pcall(function() getgenv().NoclipData.Conn:Disconnect() end)
@@ -809,9 +800,9 @@ TeleportClick = {
         getgenv().TPClickState = state
 
         if state then
-            print("Teleport Click ATIVADO")
+            -- Teleport Click ATIVADO
         else
-            print("Teleport Click DESATIVADO")
+            -- Teleport Click DESATIVADO
         end
 
         if not getgenv().TPClickConnection then
@@ -1403,8 +1394,6 @@ EgorMode = {
                 setupCharacter(char)
             end)
 
-            print(">> Egor Mode ATIVADO")
-
         else
             -- restaurar TODAS as velocidades
             if egor.OriginalSpeeds then
@@ -1429,7 +1418,6 @@ EgorMode = {
                 egor.CharConn = nil
             end
 
-            print(">> Egor Mode DESATIVADO")
         end
     end
 },
@@ -1493,8 +1481,6 @@ FakeDeath = {
                 end
             end)
 
-            print(">> Fake Death ENABLED")
-
         else
             -- Avisar servidor
             if ReplicatedStorage:FindFirstChild("KauaRemote") then
@@ -1533,7 +1519,6 @@ FakeDeath = {
                 end
             end
 
-            print(">> Fake Death DISABLED")
         end
     end
 },
@@ -1600,7 +1585,6 @@ FakeDeath2 = {
         end
 
         if state then
-            print("")
             humanoid.PlatformStand = true
 
             data.InputBegan = UserInputService.InputBegan:Connect(onInputBegan)
@@ -1608,7 +1592,6 @@ FakeDeath2 = {
             data.RenderStep = RunService.RenderStepped:Connect(flyStep)
 
         else
-            print("")
             humanoid.PlatformStand = false
 
             if data.InputBegan then data.InputBegan:Disconnect() end
@@ -2523,8 +2506,6 @@ BetaMode = {
                 setupCharacter(char)
             end)
 
-            print(">> Beta Mode ATIVADO")
-
         else
             -- restaurar TODAS as velocidades
             if beta.OriginalSpeeds then
@@ -2549,7 +2530,6 @@ BetaMode = {
                 beta.CharConn = nil
             end
 
-            print(">> Beta Mode DESATIVADO")
         end
     end
 },
@@ -3422,9 +3402,8 @@ end
 local function runInvisfling()
     local speaker = LocalPlayer
     local ch = speaker.Character
-    if not ch then return warn("No character") end
+    if not ch then return end
 
-    print("★ Invisfling V3 starting...")
 
     local humanoid = ch:FindFirstChildWhichIsA("Humanoid")
     if humanoid then
@@ -3450,10 +3429,10 @@ local function runInvisfling()
     z1.Anchored = true
     z1.Position = Vector3.new(0, 9999, 0)
 
-    print("  → Swap 1...")
+
     speaker.Character = prt
     task.wait(3)
-    print("  → Swap 2...")
+
     speaker.Character = ch
     task.wait(3)
 
@@ -3462,7 +3441,7 @@ local function runInvisfling()
     newHum.Parent = ch
 
     local root = getRoot(ch)
-    if not root then return warn("No RootPart") end
+    if not root then return end
     rootRef = root
 
     -- Strip character
@@ -3478,7 +3457,7 @@ local function runInvisfling()
     root.Material = CONFIG.RootMaterial
 
     -- Apply effects
-    print("  → Effects...")
+
     applyFace(root)
     applyTrail(root)
     applyParticles(root)
@@ -3495,12 +3474,12 @@ local function runInvisfling()
     buildLimbs(root)
 
     -- Flight
-    print("  → Flight...")
+
     sFLY()
     workspace.CurrentCamera.CameraSubject = root
 
     -- Fling
-    print("  → Fling...")
+
     local bambam = Instance.new("BodyThrust")
     bambam.Parent = root
     bambam.Force = Vector3.new(CONFIG.FlingForce, CONFIG.FlingForce * CONFIG.FlingMultiplier, CONFIG.FlingForce)
@@ -3510,14 +3489,10 @@ local function runInvisfling()
     startUpdateLoop(root, spin)
 
     -- GUI
-    print("  → GUI...")
+
     createGUI(root)
 
-    print("═══════════════════════════════════")
-    print("★ INVISFLING V3 ACTIVE ★")
-    print("  RightShift = Toggle Menu")
-    print("  WASD = Fly | QE = Up/Down")
-    print("═══════════════════════════════════")
+
 end
 
 runInvisfling()
@@ -3536,189 +3511,386 @@ QuietServer = {
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+
 local player = Players.LocalPlayer
 local placeId = game.PlaceId
-local MAX_PLAYERS = 2 -- Pessoas minimas, você e alguém
+
 local foundServer = nil
+
 --==============================================================
--- Função de achar o servidor mais vazio
+-- Função de pegar servidores
 --==============================================================
+
 local function getServers(cursor)
     local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"
+    
     if cursor then
         url = url .. "&cursor=" .. cursor
     end
+
     local success, response = pcall(function()
         return game:HttpGet(url)
     end)
+
     if success then
         return HttpService:JSONDecode(response)
-    else
-        return nil
     end
+
+    return nil
 end
+
+--==============================================================
+-- Procurar servidor mais vazio
+--==============================================================
+
 local cursor = nil
---==============================================================
--- Loop
---==============================================================
+local bestServer = nil
+local lowestPlayers = math.huge
+
 repeat
     local data = getServers(cursor)
+
     if data and data.data then
         for _, server in pairs(data.data) do
-            if server.playing <= MAX_PLAYERS and server.id ~= game.JobId then
-                foundServer = server.id
-                break
+            if server.id ~= game.JobId then
+                if server.playing < lowestPlayers then
+                    lowestPlayers = server.playing
+                    bestServer = server.id
+
+                    if server.playing == 0 then
+                        break
+                    end
+                end
             end
         end
+
         cursor = data.nextPageCursor
     else
         break
     end
-    task.wait(0.5) -- esperar 0.5 segundos para teleportar
-until foundServer or not cursor
+
+    task.wait(0.2)
+until (lowestPlayers == 0) or not cursor
+
+foundServer = bestServer
+
 --==============================================================
--- Teleportar
+-- Função de mensagem na tela
 --==============================================================
-if foundServer then
-	local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local player = Players.LocalPlayer
 
--- limpar caption antiga
-local old = player.PlayerGui:FindFirstChild("GameCaptionGui")
-if old then old:Destroy() end
+local function showMessage(textMsg, color)
+    local old = player.PlayerGui:FindFirstChild("GameCaptionGui")
+    if old then old:Destroy() end
 
--- GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "GameCaptionGui"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-gui.Parent = player.PlayerGui
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "GameCaptionGui"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.Parent = player.PlayerGui
 
--- container (posição exata)
-local frame = Instance.new("Frame")
-frame.AnchorPoint = Vector2.new(0.5, 1)
-frame.Position = UDim2.new(0.5, 0, 0.945, 0)
-frame.Size = UDim2.new(0.65, 0, 0.055, 0)
-frame.BackgroundTransparency = 1
-frame.Parent = gui
+    local frame = Instance.new("Frame")
+    frame.AnchorPoint = Vector2.new(0.5, 1)
+    frame.Position = UDim2.new(0.5, 0, 0.945, 0)
+    frame.Size = UDim2.new(0.65, 0, 0.055, 0)
+    frame.BackgroundTransparency = 1
+    frame.Parent = gui
 
--- texto
-local text = Instance.new("TextLabel")
-text.BackgroundTransparency = 1
-text.Size = UDim2.fromScale(1, 1)
-text.TextWrapped = true
-text.TextScaled = false
-text.TextXAlignment = Enum.TextXAlignment.Center
-text.TextYAlignment = Enum.TextYAlignment.Center
-text.TextScaled = true
+    local text = Instance.new("TextLabel")
+    text.BackgroundTransparency = 1
+    text.Size = UDim2.fromScale(1, 1)
+    text.TextWrapped = true
+    text.TextXAlignment = Enum.TextXAlignment.Center
+    text.TextYAlignment = Enum.TextYAlignment.Center
+    text.TextScaled = true
+    text.Font = Enum.Font.GothamSemibold
+    text.TextSize = 26
+    text.TextColor3 = color
+    text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    text.TextStrokeTransparency = 0.65
+    text.TextTransparency = 1
+    text.Text = textMsg
+    text.Parent = frame
 
--- 🔴 FONTE CORRETA
-text.Font = Enum.Font.GothamSemibold
-text.TextSize = 26
-
--- 🔴 COR CORRETA (bege do jogo)
-text.TextColor3 = Color3.fromRGB(0, 255, 0)
-
--- 🔴 STROKE SUAVE
-text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-text.TextStrokeTransparency = 0.65
-
--- animação
-text.TextTransparency = 1
-text.Text = 'Success! You will be teleported in a few moments.'
-text.Parent = frame
-
--- fade in
-TweenService:Create(
-    text,
-    TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-    {TextTransparency = 0}
-):Play()
-
--- duração
-task.delay(5, function()
     TweenService:Create(
         text,
-        TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-        {TextTransparency = 1}
+        TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {TextTransparency = 0}
     ):Play()
 
-    task.delay(0.3, function()
-        gui:Destroy()
+    task.delay(5, function()
+        TweenService:Create(
+            text,
+            TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {TextTransparency = 1}
+        ):Play()
+
+        task.delay(0.3, function()
+            gui:Destroy()
+        end)
     end)
-end)
+end
+
+--==============================================================
+-- Teleporte
+--==============================================================
+
+if foundServer then
+    showMessage("Success! You will be teleported in a few moments.", Color3.fromRGB(0, 255, 0))
+    task.wait(0.5)
     TeleportService:TeleportToPlaceInstance(placeId, foundServer, player)
 else
-	local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
+    showMessage("Something went wrong and you weren't teleported.", Color3.fromRGB(255, 0, 0))
+end
+        end
+    },
+    ServerFinder = {
+        Nome = "ServerFinder",
+        IsToggle = false,
+        Repeat = false,
+        Script = function()
+--==============================================================
+-- Inicio
+--==============================================================
+
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
 local player = Players.LocalPlayer
+local placeId = game.PlaceId
 
--- limpar caption antiga
-local old = player.PlayerGui:FindFirstChild("GameCaptionGui")
-if old then old:Destroy() end
+--==============================================================
+-- Função de pegar servidores
+--==============================================================
 
--- GUI
+local function getServers(cursor)
+    local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"
+    
+    if cursor then
+        url = url .. "&cursor=" .. cursor
+    end
+
+    local success, response = pcall(function()
+        return game:HttpGet(url)
+    end)
+
+    if success then
+        return HttpService:JSONDecode(response)
+    end
+
+    return nil
+end
+
+--==============================================================
+-- Procurar servidor (melhorado)
+--==============================================================
+
+local function findServer(targetPlayers)
+    local tries = 0
+
+    while tries < 3 do -- tenta algumas vezes
+        local cursor = nil
+        local pages = 0
+
+        repeat
+            local data = getServers(cursor)
+
+            if data and data.data then
+                for _, server in pairs(data.data) do
+                    if server.id ~= game.JobId then
+                        if server.playing == targetPlayers then
+                            return server.id
+                        end
+                    end
+                end
+
+                cursor = data.nextPageCursor
+                pages += 1
+            else
+                break
+            end
+
+            task.wait(0.15)
+        until not cursor or pages >= 10 -- limite de páginas
+
+        tries += 1
+    end
+
+    return nil
+end
+
+--==============================================================
+-- UI
+--==============================================================
+
 local gui = Instance.new("ScreenGui")
-gui.Name = "GameCaptionGui"
+gui.Name = "ServerFinderGui"
 gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
 gui.Parent = player.PlayerGui
 
--- container (posição exata)
 local frame = Instance.new("Frame")
-frame.AnchorPoint = Vector2.new(0.5, 1)
-frame.Position = UDim2.new(0.5, 0, 0.945, 0)
-frame.Size = UDim2.new(0.65, 0, 0.055, 0)
-frame.BackgroundTransparency = 1
+frame.Size = UDim2.new(0, 300, 0, 150)
+frame.Position = UDim2.new(0.5, -150, 0.5, -75)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.BackgroundTransparency = 0.25
+frame.Active = true
 frame.Parent = gui
 
--- texto
-local text = Instance.new("TextLabel")
-text.BackgroundTransparency = 1
-text.Size = UDim2.fromScale(1, 1)
-text.TextWrapped = true
-text.TextScaled = false
-text.TextXAlignment = Enum.TextXAlignment.Center
-text.TextYAlignment = Enum.TextYAlignment.Center
-text.TextScaled = true
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
--- 🔴 FONTE CORRETA
-text.Font = Enum.Font.GothamSemibold
-text.TextSize = 26
+local stroke = Instance.new("UIStroke", frame)
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(255,255,255)
+stroke.Transparency = 0.6
 
--- 🔴 COR CORRETA (bege do jogo)
-text.TextColor3 = Color3.fromRGB(255, 0, 0)
+-- Botão fechar (X)
 
--- 🔴 STROKE SUAVE
-text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-text.TextStrokeTransparency = 0.65
+local close = Instance.new("TextButton")
+close.Size = UDim2.new(0, 30, 0, 30)
+close.Position = UDim2.new(1, -35, 0, 5)
+close.Text = "X"
+close.TextScaled = false
+close.TextSize = 18
+close.Font = Enum.Font.GothamBold
+close.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+close.BackgroundTransparency = 0.2
+close.TextColor3 = Color3.fromRGB(255,255,255)
+close.Parent = frame
 
--- animação
-text.TextTransparency = 1
-text.Text = "Something went wrong and you weren't teleported."
-text.Parent = frame
+Instance.new("UICorner", close).CornerRadius = UDim.new(0, 8)
 
--- fade in
-TweenService:Create(
-    text,
-    TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-    {TextTransparency = 0}
-):Play()
+local closeStroke = Instance.new("UIStroke", close)
+closeStroke.Thickness = 1.5
+closeStroke.Color = Color3.fromRGB(255,255,255)
+closeStroke.Transparency = 0.4
 
--- duração
-task.delay(5, function()
-    TweenService:Create(
-        text,
-        TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-        {TextTransparency = 1}
-    ):Play()
-
-    task.delay(0.3, function()
-        gui:Destroy()
-    end)
+close.MouseButton1Click:Connect(function()
+    gui:Destroy()
 end)
-end
+
+-- Title
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -40, 0, 30)
+title.Position = UDim2.new(0, 10, 0, 5)
+title.BackgroundTransparency = 1
+title.Text = "Server Finder"
+title.TextSize = 20
+title.Font = Enum.Font.GothamSemibold
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = frame
+
+-- TextBox
+
+local textbox = Instance.new("TextBox")
+textbox.Size = UDim2.new(0.8, 0, 0, 35)
+textbox.Position = UDim2.new(0.1, 0, 0.35, 0)
+textbox.PlaceholderText = "Enter player count"
+textbox.Text = ""
+textbox.TextSize = 18
+textbox.Font = Enum.Font.Gotham
+textbox.BackgroundTransparency = 0.3
+textbox.BackgroundColor3 = Color3.fromRGB(60,60,60)
+textbox.TextColor3 = Color3.fromRGB(255,255,255)
+textbox.Parent = frame
+
+Instance.new("UICorner", textbox).CornerRadius = UDim.new(0, 8)
+
+local tbStroke = Instance.new("UIStroke", textbox)
+tbStroke.Thickness = 1.5
+tbStroke.Color = Color3.fromRGB(255,255,255)
+tbStroke.Transparency = 0.6
+
+-- Button
+
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0.8, 0, 0, 35)
+button.Position = UDim2.new(0.1, 0, 0.65, 0)
+button.Text = "Teleport"
+button.TextSize = 18
+button.Font = Enum.Font.GothamSemibold
+button.BackgroundTransparency = 0.3
+button.BackgroundColor3 = Color3.fromRGB(60,60,60)
+button.TextColor3 = Color3.fromRGB(255,255,255)
+button.Parent = frame
+
+Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
+
+local btnStroke = Instance.new("UIStroke", button)
+btnStroke.Thickness = 1.5
+btnStroke.Color = Color3.fromRGB(255,255,255)
+btnStroke.Transparency = 0.6
+
+--==============================================================
+-- Drag
+--==============================================================
+
+local dragging = false
+local dragInput, dragStart, startPos
+
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+--==============================================================
+-- Botão ação
+--==============================================================
+
+button.MouseButton1Click:Connect(function()
+    local number = tonumber(textbox.Text)
+
+    if not number then
+        button.Text = "Invalid"
+        task.wait(2)
+        button.Text = "Teleport"
+        return
+    end
+
+    button.Text = "Searching..."
+
+    local serverId = findServer(number)
+
+    if serverId then
+        button.Text = "Teleporting..."
+        task.wait(0.5)
+        TeleportService:TeleportToPlaceInstance(placeId, serverId, player)
+    else
+        button.Text = "Not found"
+        task.wait(2)
+        button.Text = "Teleport"
+    end
+end)
         end
     },
     BotaoTeste5 = {
@@ -3726,7 +3898,7 @@ end
         IsToggle = false,
         Repeat = false,
         Script = function()
-            print("era tudo uma teste...")
+            -- era tudo uma teste...
         end
     },
 }
@@ -3787,7 +3959,6 @@ local function setupHumanoid()
     if player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
         humanoid = player.Character:FindFirstChildOfClass("Humanoid")
         humanoid.WalkSpeed = speedValue or humanoid.WalkSpeed
-        print("Humanoid configurado. Velocidade: " .. humanoid.WalkSpeed)
     end
 end
 
@@ -3887,7 +4058,6 @@ local function createCustomButton(buttonName, buttonData, Content, layoutOrder)
             end)
             
             if not success then
-                warn("Erro no script do botão " .. buttonName .. ": " .. tostring(errorMsg))
                 -- Reverter estado se houver erro
                 buttonStates[buttonName] = not newState
                 buttonFrame.Text = buttonData.Nome .. " : " .. (not newState and "ON" or "OFF")
@@ -3907,7 +4077,6 @@ local function createCustomButton(buttonName, buttonData, Content, layoutOrder)
                             buttonData.Script(true)
                         end)
                         if not successLoop then
-                            warn("Erro no loop do botão " .. buttonName .. ": " .. tostring(errorLoop))
                             buttonConnections[buttonName]:Disconnect()
                             buttonConnections[buttonName] = nil
                         end
@@ -3939,7 +4108,7 @@ local function createCustomButton(buttonName, buttonData, Content, layoutOrder)
             end)
             
             if not success then
-                warn("Erro no script do botão " .. buttonName .. ": " .. tostring(errorMsg))
+                -- erro silencioso
             end
             
             -- Garantir que volta à cor original mesmo se houver erro
@@ -4159,7 +4328,6 @@ local function setupPlayerLeaveNotification()
     -- Armazenar a conexão para limpeza
     connections.playerRemoving = onPlayerRemoving
     
-    print("Sistema de notificação de saída configurado!")
 end
 
 -- ========== FUNÇÃO MELHORADA PARA ATUALIZAR JOGADOR RASTREADO ==========
@@ -4189,8 +4357,6 @@ local function updateTrackedPlayer(playerFound)
         if ESPBtn then ESPBtn.Visible = true end
         if LoopTPBtn then LoopTPBtn.Visible = true end
         
-        print("Jogador rastreado: " .. playerFound.Name .. 
-              (playerFound.DisplayName and " (Display: " .. playerFound.DisplayName .. ")" or ""))
     else
         -- Se não encontrar jogador, limpar tudo
         trackedPlayer = nil
@@ -4755,12 +4921,7 @@ SpeedSet.MouseButton1Click:Connect(function()
         -- Tenta aplicar ao humanoid atual
         if humanoid then
             humanoid.WalkSpeed = v
-            print("Velocidade definida para: " .. v)
-        else
-            print("Velocidade salva: " .. v .. " (será aplicada quando o personagem spawnar)")
         end
-    else
-        print("Valor inválido! Digite um número.")
     end
 end)
 
@@ -4841,7 +5002,6 @@ TeleToPlayer.MouseButton1Click:Connect(function()
         local tr = currentTarget.Character:FindFirstChild("HumanoidRootPart")
         if r and tr then 
             r.CFrame = tr.CFrame * CFrame.new(0,0,tpDistanceStuds)
-            print("Teleportado para " .. currentTarget.Name)
         end
     end
 end)
@@ -4866,8 +5026,6 @@ TelePosBtn.MouseButton1Click:Connect(function()
     if not teleportToPosition(PosBox.Text) then
         PosBox.Text = "Formato inválido! Use X,Y,Z"
         task.delay(1.4, function() if PosBox then PosBox.Text = "" end end)
-    else
-        print("Teleportado para posição!")
     end
 end)
 
@@ -4877,7 +5035,6 @@ GetPosBtn.MouseButton1Click:Connect(function()
     if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local p = player.Character.HumanoidRootPart.Position
         PosBox.Text = string.format("%.2f, %.2f, %.2f", p.X, p.Y, p.Z)
-        print("Posição copiada: " .. PosBox.Text)
     end
 end)
 
@@ -4918,9 +5075,6 @@ SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
             trackedPlayer = foundPlayer
             updatePlayerDisplay(foundPlayer)
             
-            -- Mostra feedback no output
-            print("Jogador encontrado: " .. foundPlayer.Name .. 
-                (foundPlayer.DisplayName and " (Display: " .. foundPlayer.DisplayName .. ")" or ""))
         end
     else
         updatePlayerDisplay(nil)
@@ -5068,9 +5222,9 @@ local function toggleMouse()
     mouseUnlocked = not mouseUnlocked
 
     if mouseUnlocked then
-        print("")
+        -- Mouse unlocked
     else
-        print(" ")
+        -- Mouse locked
     end
 end
 
