@@ -3523,6 +3523,204 @@ end
 runInvisfling()
         end
     },
+	    
+QuietServer = {
+        Nome = "QuietServer",
+        IsToggle = false,
+        Repeat = false,
+        Script = function()
+--==============================================================
+-- Inicio
+--==============================================================
+
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local placeId = game.PlaceId
+local MAX_PLAYERS = 2 -- Pessoas minimas, você e alguém
+local foundServer = nil
+--==============================================================
+-- Função de achar o servidor mais vazio
+--==============================================================
+local function getServers(cursor)
+    local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"
+    if cursor then
+        url = url .. "&cursor=" .. cursor
+    end
+    local success, response = pcall(function()
+        return game:HttpGet(url)
+    end)
+    if success then
+        return HttpService:JSONDecode(response)
+    else
+        return nil
+    end
+end
+local cursor = nil
+--==============================================================
+-- Loop
+--==============================================================
+repeat
+    local data = getServers(cursor)
+    if data and data.data then
+        for _, server in pairs(data.data) do
+            if server.playing <= MAX_PLAYERS and server.id ~= game.JobId then
+                foundServer = server.id
+                break
+            end
+        end
+        cursor = data.nextPageCursor
+    else
+        break
+    end
+    task.wait(0.5) -- esperar 0.5 segundos para teleportar
+until foundServer or not cursor
+--==============================================================
+-- Teleportar
+--==============================================================
+if foundServer then
+	local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local player = Players.LocalPlayer
+
+-- limpar caption antiga
+local old = player.PlayerGui:FindFirstChild("GameCaptionGui")
+if old then old:Destroy() end
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "GameCaptionGui"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = player.PlayerGui
+
+-- container (posição exata)
+local frame = Instance.new("Frame")
+frame.AnchorPoint = Vector2.new(0.5, 1)
+frame.Position = UDim2.new(0.5, 0, 0.945, 0)
+frame.Size = UDim2.new(0.65, 0, 0.055, 0)
+frame.BackgroundTransparency = 1
+frame.Parent = gui
+
+-- texto
+local text = Instance.new("TextLabel")
+text.BackgroundTransparency = 1
+text.Size = UDim2.fromScale(1, 1)
+text.TextWrapped = true
+text.TextScaled = false
+text.TextXAlignment = Enum.TextXAlignment.Center
+text.TextYAlignment = Enum.TextYAlignment.Center
+text.TextScaled = true
+
+-- 🔴 FONTE CORRETA
+text.Font = Enum.Font.GothamSemibold
+text.TextSize = 26
+
+-- 🔴 COR CORRETA (bege do jogo)
+text.TextColor3 = Color3.fromRGB(0, 255, 0)
+
+-- 🔴 STROKE SUAVE
+text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+text.TextStrokeTransparency = 0.65
+
+-- animação
+text.TextTransparency = 1
+text.Text = 'Success! You will be teleported in a few moments.'
+text.Parent = frame
+
+-- fade in
+TweenService:Create(
+    text,
+    TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    {TextTransparency = 0}
+):Play()
+
+-- duração
+task.delay(5, function()
+    TweenService:Create(
+        text,
+        TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        {TextTransparency = 1}
+    ):Play()
+
+    task.delay(0.3, function()
+        gui:Destroy()
+    end)
+end)
+    TeleportService:TeleportToPlaceInstance(placeId, foundServer, player)
+else
+	local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local player = Players.LocalPlayer
+
+-- limpar caption antiga
+local old = player.PlayerGui:FindFirstChild("GameCaptionGui")
+if old then old:Destroy() end
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "GameCaptionGui"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = player.PlayerGui
+
+-- container (posição exata)
+local frame = Instance.new("Frame")
+frame.AnchorPoint = Vector2.new(0.5, 1)
+frame.Position = UDim2.new(0.5, 0, 0.945, 0)
+frame.Size = UDim2.new(0.65, 0, 0.055, 0)
+frame.BackgroundTransparency = 1
+frame.Parent = gui
+
+-- texto
+local text = Instance.new("TextLabel")
+text.BackgroundTransparency = 1
+text.Size = UDim2.fromScale(1, 1)
+text.TextWrapped = true
+text.TextScaled = false
+text.TextXAlignment = Enum.TextXAlignment.Center
+text.TextYAlignment = Enum.TextYAlignment.Center
+text.TextScaled = true
+
+-- 🔴 FONTE CORRETA
+text.Font = Enum.Font.GothamSemibold
+text.TextSize = 26
+
+-- 🔴 COR CORRETA (bege do jogo)
+text.TextColor3 = Color3.fromRGB(255, 0, 0)
+
+-- 🔴 STROKE SUAVE
+text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+text.TextStrokeTransparency = 0.65
+
+-- animação
+text.TextTransparency = 1
+text.Text = "Something went wrong and you weren't teleported."
+text.Parent = frame
+
+-- fade in
+TweenService:Create(
+    text,
+    TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    {TextTransparency = 0}
+):Play()
+
+-- duração
+task.delay(5, function()
+    TweenService:Create(
+        text,
+        TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        {TextTransparency = 1}
+    ):Play()
+
+    task.delay(0.3, function()
+        gui:Destroy()
+    end)
+end)
+end
+        end
+    },
     BotaoTeste5 = {
         Nome = "Botão teste",
         IsToggle = false,
