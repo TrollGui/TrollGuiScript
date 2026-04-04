@@ -3523,7 +3523,7 @@ end
 runInvisfling()
         end
     },
-QuietServer = {
+	QuietServer = {
         Nome = "QuietServer",
         IsToggle = false,
         Repeat = false,
@@ -3668,13 +3668,14 @@ else
 end
         end
     },
-	LoudServer = {
-    Name = "LoudServer",
+LoudServer = {
+    Nome = "LoudServer",
     IsToggle = false,
     Repeat = false,
     Script = function()
+
         --==============================================================
-        -- Start
+        -- Services
         --==============================================================
 
         local HttpService = game:GetService("HttpService")
@@ -3688,7 +3689,7 @@ end
         local foundServer = nil
 
         --==============================================================
-        -- Function to get servers
+        -- Get servers
         --==============================================================
 
         local function getServers(cursor)
@@ -3710,7 +3711,7 @@ end
         end
 
         --==============================================================
-        -- Find the most crowded server
+        -- Find best server (cheio, mas com vaga)
         --==============================================================
 
         local cursor = nil
@@ -3723,12 +3724,18 @@ end
             if data and data.data then
                 for _, server in pairs(data.data) do
                     if server.id ~= game.JobId then
-                        if server.playing > highestPlayers then
-                            highestPlayers = server.playing
-                            bestServer = server.id
+                        
+                        -- 🔑 GARANTE QUE TEM VAGA
+                        if server.playing < server.maxPlayers then
+                            
+                            -- (opcional) evita servidor muito vazio
+                            if server.playing >= 10 then
+                                
+                                if server.playing > highestPlayers then
+                                    highestPlayers = server.playing
+                                    bestServer = server.id
+                                end
 
-                            if server.playing >= 50 then -- assuming a server is "full" when 50 players are playing
-                                break
                             end
                         end
                     end
@@ -3740,12 +3747,12 @@ end
             end
 
             task.wait(0.2)
-        until (highestPlayers >= 50) or not cursor
+        until not cursor
 
         foundServer = bestServer
 
         --==============================================================
-        -- Function to show a message on the screen
+        -- UI Message
         --==============================================================
 
         local function showMessage(textMsg, color)
@@ -3805,12 +3812,13 @@ end
         --==============================================================
 
         if foundServer then
-            showMessage("Success! You will be teleported in a few moments.", Color3.fromRGB(0, 255, 0))
+            showMessage("Entrando em servidor cheio com vaga...", Color3.fromRGB(0, 255, 0))
             task.wait(0.5)
             TeleportService:TeleportToPlaceInstance(placeId, foundServer, player)
         else
-            showMessage("Something went wrong and you weren't teleported.", Color3.fromRGB(255, 0, 0))
+            showMessage("Nenhum servidor com vaga encontrado.", Color3.fromRGB(255, 0, 0))
         end
+
     end
 },
     BotaoTeste5 = {
