@@ -942,123 +942,27 @@ BotaoTesteMorrer = {
 
     end
 },
-BotaoTesteJobId = {
-    Nome = "JobId",
+InfiniteJump = {
+    Nome = "Infinite Jump",
     IsToggle = true,
     Repeat = false,
-    Script = function()
-
-        local Players = game:GetService("Players")
-        local Player = Players.LocalPlayer
-        local PlayerGui = Player:WaitForChild("PlayerGui")
-
-        -- Se já existe, DESLIGA (OFF)
-        local existingGui = PlayerGui:FindFirstChild("JobId")
-        if existingGui then
-            existingGui:Destroy()
-            return
+    Script = function(state)
+        local UIS = game:GetService("UserInputService")
+        local player = game.Players.LocalPlayer
+        
+        if state then
+            getgenv().InfiniteJumpConn = UIS.JumpRequest:Connect(function()
+                local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid and humanoid:GetState() ~= Enum.HumanoidStateType.Jumping then
+                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
+            end)
+        else
+            if getgenv().InfiniteJumpConn then
+                getgenv().InfiniteJumpConn:Disconnect()
+                getgenv().InfiniteJumpConn = nil
+            end
         end
-
-        -- ================== ON ==================
-
-        local UserInputService = game:GetService("UserInputService")
-        local TeleportService = game:GetService("TeleportService")
-        local TweenService = game:GetService("TweenService")
-        local TextService = game:GetService("TextService")
-
-        -- Colors
-        local BLUE = Color3.fromRGB(0, 120, 215)
-        local DARK = Color3.fromRGB(25, 30, 40)
-        local GRAY = Color3.fromRGB(45, 50, 60)
-        local LIGHT = Color3.fromRGB(240, 245, 250)
-
-        -- ScreenGui
-        local ScreenGui = Instance.new("ScreenGui")
-        ScreenGui.Name = "JobId"
-        ScreenGui.ResetOnSpawn = false
-        ScreenGui.Parent = PlayerGui
-
-        -- JobId Button
-        local jobIdButton = Instance.new("TextButton")
-        jobIdButton.Size = UDim2.new(0, 160, 0, 45)
-        jobIdButton.Position = UDim2.new(0.5, -80, 0.1, 0)
-        jobIdButton.AnchorPoint = Vector2.new(0.5, 0)
-        jobIdButton.BackgroundColor3 = BLUE
-        jobIdButton.TextColor3 = LIGHT
-        jobIdButton.Text = "JobId: " .. game.JobId
-        jobIdButton.Font = Enum.Font.SourceSansBold
-        jobIdButton.TextSize = 14
-        jobIdButton.AutoButtonColor = false
-        jobIdButton.Parent = ScreenGui
-
-        local corner = Instance.new("UICorner", jobIdButton)
-        corner.CornerRadius = UDim.new(0, 8)
-
-        -- Teleport Frame
-        local teleportFrame = Instance.new("Frame")
-        teleportFrame.Size = UDim2.new(0, 280, 0, 180)
-        teleportFrame.Position = UDim2.new(0.5, -140, 0.3, 0)
-        teleportFrame.AnchorPoint = Vector2.new(0.5, 0)
-        teleportFrame.BackgroundColor3 = DARK
-        teleportFrame.BorderSizePixel = 0
-        teleportFrame.Visible = false
-        teleportFrame.Parent = ScreenGui
-
-        Instance.new("UICorner", teleportFrame).CornerRadius = UDim.new(0, 8)
-
-        -- Input
-        local inputFrame = Instance.new("Frame", teleportFrame)
-        inputFrame.Size = UDim2.new(0.85, 0, 0, 40)
-        inputFrame.Position = UDim2.new(0.075, 0, 0.3, 0)
-        inputFrame.BackgroundColor3 = GRAY
-        Instance.new("UICorner", inputFrame)
-
-        local jobIdInput = Instance.new("TextBox", inputFrame)
-        jobIdInput.Size = UDim2.new(1, -10, 1, -10)
-        jobIdInput.Position = UDim2.new(0, 5, 0, 5)
-        jobIdInput.BackgroundTransparency = 1
-        jobIdInput.TextColor3 = LIGHT
-        jobIdInput.PlaceholderText = "Enter JobId here..."
-        jobIdInput.Font = Enum.Font.SourceSans
-        jobIdInput.TextSize = 14
-        jobIdInput.ClearTextOnFocus = false
-
-        -- Teleport Button
-        local teleportButton = Instance.new("TextButton", teleportFrame)
-        teleportButton.Size = UDim2.new(0.85, 0, 0, 40)
-        teleportButton.Position = UDim2.new(0.075, 0, 0.65, 0)
-        teleportButton.BackgroundColor3 = BLUE
-        teleportButton.TextColor3 = LIGHT
-        teleportButton.Text = "TELEPORT"
-        teleportButton.Font = Enum.Font.SourceSansBold
-        teleportButton.TextSize = 14
-        teleportButton.AutoButtonColor = false
-
-        Instance.new("UICorner", teleportButton)
-
-        -- Functions
-        jobIdButton.MouseButton1Click:Connect(function()
-            if setclipboard then
-                setclipboard(game.JobId)
-                jobIdButton.Text = "Copied!"
-                task.wait(1.5)
-                jobIdButton.Text = "JobId: " .. game.JobId
-            end
-        end)
-
-        jobIdButton.MouseButton2Click:Connect(function()
-            teleportFrame.Visible = not teleportFrame.Visible
-        end)
-
-        teleportButton.MouseButton1Click:Connect(function()
-            if jobIdInput.Text ~= "" then
-                TeleportService:TeleportToPlaceInstance(
-                    game.PlaceId,
-                    jobIdInput.Text,
-                    Player
-                )
-            end
-        end)
     end
 },
 			    -- Botão teste
@@ -4096,21 +4000,15 @@ ClickBlock = {
         end
     end
 },
-    BotaoTeste5 = {
-        Nome = "Botão teste",
-        IsToggle = false,
-        Repeat = false,
-        Script = function()
-            print("era tudo uma teste...")
-        end
-    },
 }
 -- FIM DA SEÇÃO DE BOTÕES ↑↑↑
 
 -- Variáveis do sistema de botões
 local buttonStates = {}
 local buttonConnections = {}
-local buttonCooldowns = {} -- Para prevenir cliques rápidos
+local buttonCooldowns = {}
+local customButtonFrames = {}
+local searchBoxCustom = nil
 
 -- Garantir RemoteEvent
 if not ReplicatedStorage:FindFirstChild("TrollGuiRemote") then
@@ -4125,7 +4023,6 @@ local allEspEnabled = false
 local minimizeKey = "R"
 
 local function applySpeedLoop()
-    -- Desconecta loop antigo se existir
     if speedConnection then
         speedConnection:Disconnect()
         speedConnection = nil
@@ -4143,7 +4040,6 @@ local function applySpeedLoop()
     end)
 end
 
-
 local espEnabledSingle = false
 local spectateEnabled = false
 local loopTPEnabled = false
@@ -4153,7 +4049,7 @@ local trackedPlayer = nil
 local tpDistanceStuds = 2
 
 local highlights = {}
-local connections = {} -- store connection objects for cleanup
+local connections = {}
 
 -- Setup humanoid & animations
 local humanoid = nil
@@ -4166,13 +4062,11 @@ local function setupHumanoid()
     end
 end
 
--- Conectar quando o personagem é adicionado
 player.CharacterAdded:Connect(function()
     task.wait(0.5)
     setupHumanoid()
 end)
 
--- Configurar se já tiver personagem
 if player.Character then 
     task.wait(0.5)
     setupHumanoid() 
@@ -4180,11 +4074,9 @@ end
 
 -- Funções do sistema de botões
 local function createCustomButton(buttonName, buttonData, Content, layoutOrder)
-    -- Inicializar estado
     buttonStates[buttonName] = false
     buttonCooldowns[buttonName] = false
     
-    -- Criar botão
     local buttonFrame = Instance.new("TextButton")
     buttonFrame.Name = buttonName
     buttonFrame.Size = UDim2.new(0.95, 0, 0, 36)
@@ -4199,19 +4091,18 @@ local function createCustomButton(buttonName, buttonData, Content, layoutOrder)
     end
     buttonFrame.Parent = Content
     
-    -- Adicionar corner
+    customButtonFrames[buttonName] = buttonFrame
+    
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = buttonFrame
     
-    -- Configurar texto inicial
     if buttonData.IsToggle then
         buttonFrame.Text = buttonData.Nome .. " : OFF"
     else
         buttonFrame.Text = buttonData.Nome
     end
     
-    -- Efeito hover (aumentar tamanho)
     local normalSize = buttonFrame.Size
     local bigSize = UDim2.new(normalSize.X.Scale, normalSize.X.Offset + 10, 
         normalSize.Y.Scale, normalSize.Y.Offset + 4)
@@ -4228,14 +4119,11 @@ local function createCustomButton(buttonName, buttonData, Content, layoutOrder)
         end)
     end)
     
-    -- Função para executar script do botão
     local function executeButtonScript()
-        -- Prevenir múltiplos cliques rápidos
         if buttonCooldowns[buttonName] then
             return
         end
         
-        -- Ativar cooldown por 0.3 segundos para botões não-toggle
         if not buttonData.IsToggle then
             buttonCooldowns[buttonName] = true
             task.delay(0.3, function()
@@ -4247,14 +4135,11 @@ local function createCustomButton(buttonName, buttonData, Content, layoutOrder)
             local newState = not buttonStates[buttonName]
             buttonStates[buttonName] = newState
             
-            -- Atualizar texto
             buttonFrame.Text = buttonData.Nome .. " : " .. (newState and "ON" or "OFF")
             
-            -- Atualizar cor
             buttonFrame.BackgroundColor3 = newState and Color3.fromRGB(60, 200, 80) 
                 or Color3.fromRGB(48, 48, 48)
             
-            -- Executar script com pcall para prevenir erros
             local success, errorMsg = pcall(function()
                 if buttonData.Script then
                     buttonData.Script(newState)
@@ -4263,14 +4148,12 @@ local function createCustomButton(buttonName, buttonData, Content, layoutOrder)
             
             if not success then
                 warn("Erro no script do botão " .. buttonName .. ": " .. tostring(errorMsg))
-                -- Reverter estado se houver erro
                 buttonStates[buttonName] = not newState
                 buttonFrame.Text = buttonData.Nome .. " : " .. (not newState and "ON" or "OFF")
                 buttonFrame.BackgroundColor3 = not newState and Color3.fromRGB(60, 200, 80) 
                     or Color3.fromRGB(48, 48, 48)
             end
             
-            -- Se for repeat, iniciar loop
             if newState and buttonData.Repeat then
                 if buttonConnections[buttonName] then
                     buttonConnections[buttonName]:Disconnect()
@@ -4294,19 +4177,15 @@ local function createCustomButton(buttonName, buttonData, Content, layoutOrder)
                     end
                 end)
             elseif not newState and buttonData.Repeat then
-                -- Parar loop se desativado
                 if buttonConnections[buttonName] then
                     buttonConnections[buttonName]:Disconnect()
                     buttonConnections[buttonName] = nil
                 end
             end
         else
-            -- Botão normal (não toggle)
-            -- Efeito visual temporário (flash azul)
             local originalColor = buttonFrame.BackgroundColor3
             buttonFrame.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
             
-            -- Executar script com pcall
             local success, errorMsg = pcall(function()
                 if buttonData.Script then
                     buttonData.Script()
@@ -4317,14 +4196,12 @@ local function createCustomButton(buttonName, buttonData, Content, layoutOrder)
                 warn("Erro no script do botão " .. buttonName .. ": " .. tostring(errorMsg))
             end
             
-            -- Garantir que volta à cor original mesmo se houver erro
             local restoreColor = function()
                 if buttonFrame and buttonFrame.Parent then
                     buttonFrame.BackgroundColor3 = originalColor
                 end
             end
             
-            -- Usar task.spawn para garantir que a cor seja restaurada
             task.spawn(function()
                 task.wait(0.2)
                 restoreColor()
@@ -4332,7 +4209,6 @@ local function createCustomButton(buttonName, buttonData, Content, layoutOrder)
         end
     end
     
-    -- Conectar clique
     buttonFrame.MouseButton1Click:Connect(executeButtonScript)
     
     return buttonFrame
@@ -4368,7 +4244,6 @@ local function clearAllESP()
     highlights = {}
 end
 
--- Apply allESP at heartbeat to capture new players
 connections.espAll = RunService.Heartbeat:Connect(function()
     if allEspEnabled then
         for _, p in pairs(Players:GetPlayers()) do
@@ -4377,7 +4252,6 @@ connections.espAll = RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Loop TP
 function toggleLoopTP()
     loopTPEnabled = not loopTPEnabled
     if loopTPEnabled then
@@ -4395,7 +4269,6 @@ function toggleLoopTP()
     return loopTPEnabled
 end
 
--- Spectate toggle
 function toggleSpectate()
     spectateEnabled = not spectateEnabled
     if spectateEnabled and currentTarget and currentTarget.Character then
@@ -4407,7 +4280,6 @@ function toggleSpectate()
     return spectateEnabled
 end
 
--- Teleport to position helper
 local function teleportToPosition(txt)
     local text = tostring(txt or "")
     text = text:gsub("%s+", "")
@@ -4419,41 +4291,35 @@ local function teleportToPosition(txt)
     return false
 end
 
--- Função melhorada para buscar jogador por nome ou display name
 local function findPlayerByNameOrDisplayName(searchText)
     if searchText == "" then return nil end
     
     local searchLower = string.lower(searchText)
     
-    -- Primeiro tenta encontrar por nome exato
     for _, p in pairs(Players:GetPlayers()) do
         if string.lower(p.Name) == searchLower then
             return p
         end
     end
     
-    -- Tenta encontrar por display name exato
     for _, p in pairs(Players:GetPlayers()) do
         if p.DisplayName and string.lower(p.DisplayName) == searchLower then
             return p
         end
     end
     
-    -- Tenta encontrar por parte do nome
     for _, p in pairs(Players:GetPlayers()) do
         if string.find(string.lower(p.Name), searchLower, 1, true) then
             return p
         end
     end
     
-    -- Tenta encontrar por parte do display name
     for _, p in pairs(Players:GetPlayers()) do
         if p.DisplayName and string.find(string.lower(p.DisplayName), searchLower, 1, true) then
             return p
         end
     end
     
-    -- Tenta encontrar por ID (se for número)
     local id = tonumber(searchText)
     if id then
         for _, p in pairs(Players:GetPlayers()) do
@@ -4469,7 +4335,6 @@ end
 -- ========== SISTEMA DE NOTIFICAÇÃO DE SAÍDA ==========
 local function setupPlayerLeaveNotification()
     local function onPlayerRemoving(leavingPlayer)
-        -- Verificar se é o jogador que estamos rastreando
         if trackedPlayer and leavingPlayer == trackedPlayer then
             game:GetService("StarterGui"):SetCore("SendNotification", {
                 Title = "TrollGui",
@@ -4478,11 +4343,9 @@ local function setupPlayerLeaveNotification()
                 Duration = 3
             })
             
-            -- Limpar o jogador rastreado
             trackedPlayer = nil
             currentTarget = nil
             
-            -- Atualizar a interface
             if PlayerName then
                 PlayerName.Text = "Nenhum jogador citado"
             end
@@ -4490,20 +4353,17 @@ local function setupPlayerLeaveNotification()
                 PlayerImg.Image = "rbxassetid://0"
             end
             
-            -- Esconder botões que precisam de target
             if TeleToPlayer then TeleToPlayer.Visible = false end
             if SpectateBtn then SpectateBtn.Visible = false end
             if ESPBtn then ESPBtn.Visible = false end
             if LoopTPBtn then LoopTPBtn.Visible = false end
             
-            -- Limpar ESP específico se estiver ativo
             if espEnabledSingle then
                 removeESPFor(leavingPlayer)
                 espEnabledSingle = false
                 if setESPBtnState then setESPBtnState(false) end
             end
             
-            -- Limpar spectate se estiver ativo
             if spectateEnabled then
                 spectateEnabled = false
                 if setSpectateVisual then setSpectateVisual(false) end
@@ -4513,7 +4373,6 @@ local function setupPlayerLeaveNotification()
                 end
             end
             
-            -- Parar loop TP se estiver ativo
             if loopTPEnabled then
                 loopTPEnabled = false
                 if setLoopTPVisual then setLoopTPVisual(false) end
@@ -4523,34 +4382,27 @@ local function setupPlayerLeaveNotification()
                 end
             end
             
-            -- Limpar a caixa de pesquisa
             if SearchBox then SearchBox.Text = "" end
         end
     end
     
-    -- Conectar ao evento PlayerRemoving
     Players.PlayerRemoving:Connect(onPlayerRemoving)
-    
-    -- Armazenar a conexão para limpeza
     connections.playerRemoving = onPlayerRemoving
     
     print("Sistema de notificação de saída configurado!")
 end
 
--- ========== FUNÇÃO MELHORADA PARA ATUALIZAR JOGADOR RASTREADO ==========
 local function updateTrackedPlayer(playerFound)
     if playerFound then
         currentTarget = playerFound
         trackedPlayer = playerFound
         
-        -- Atualizar display do jogador
         if PlayerImg and PlayerName then
             local ok, thumb = pcall(function() 
                 return Players:GetUserThumbnailAsync(playerFound.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420) 
             end)
             PlayerImg.Image = (ok and thumb) and thumb or "rbxassetid://0"
             
-            -- Mostra Display Name se tiver, senão mostra o Name
             if playerFound.DisplayName and playerFound.DisplayName ~= playerFound.Name then
                 PlayerName.Text = playerFound.DisplayName .. " (@" .. playerFound.Name .. ")"
             else
@@ -4558,7 +4410,6 @@ local function updateTrackedPlayer(playerFound)
             end
         end
         
-        -- Mostrar botões que precisam de target
         if TeleToPlayer then TeleToPlayer.Visible = true end
         if SpectateBtn then SpectateBtn.Visible = true end
         if ESPBtn then ESPBtn.Visible = true end
@@ -4567,7 +4418,6 @@ local function updateTrackedPlayer(playerFound)
         print("Jogador rastreado: " .. playerFound.Name .. 
               (playerFound.DisplayName and " (Display: " .. playerFound.DisplayName .. ")" or ""))
     else
-        -- Se não encontrar jogador, limpar tudo
         trackedPlayer = nil
         currentTarget = nil
         
@@ -4587,12 +4437,10 @@ end
 
 -- ========== GUI ==========
 
---// SERVICES
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local player = Players.LocalPlayer
 
---// FUNÇÃO PRA PEGAR GUI PARENT (compatível com executores)
 local function getGuiParent()
     if gethui then
         return gethui()
@@ -4601,16 +4449,14 @@ local function getGuiParent()
     end
 end
 
---// SCREEN GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "TrollGuiUIJosue"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 999
 screenGui.Parent = getGuiParent()
--- ===== ESTADO DE FECHAMENTO =====
+
 local guiClosed = false
 
---// PROTEGER GUI
 pcall(function()
     if syn and syn.protect_gui then
         syn.protect_gui(screenGui)
@@ -4626,7 +4472,6 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(0,0,0)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 
----// Título só pra teste
 local Title = Instance.new("TextLabel")
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1,0,0,40)
@@ -4636,14 +4481,13 @@ Title.TextColor3 = Color3.fromRGB(255,255,255)
 Title.TextScaled = true
 Title.Font = Enum.Font.GothamBold
 
----// Deixar TODOS os TextLabels, Buttons e TextBox brancos
 for _,v in ipairs(MainFrame:GetDescendants()) do
     if v:IsA("TextLabel") or v:IsA("TextButton") or v:IsA("TextBox") then
         v.TextColor3 = Color3.fromRGB(255,255,255)
     end
 end
 
----// DRAG COMPLETO (Segurar em qualquer parte do MainFrame)
+---// DRAG COMPLETO
 local UIS = game:GetService("UserInputService")
 local dragging = false
 local dragStart, startPos
@@ -4797,13 +4641,11 @@ PlayerName.ZIndex = 5
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 
--- ================= CONTAINER PRINCIPAL =================
 local SearchContainer = Instance.new("Frame", Content)
 SearchContainer.Size = UDim2.new(0.95,0,0,36)
 SearchContainer.BackgroundTransparency = 1
 SearchContainer.ZIndex = 4
 
--- SearchBox
 local SearchBox = Instance.new("TextBox", SearchContainer)
 SearchBox.Size = UDim2.new(1,-44,1,0)
 SearchBox.Position = UDim2.new(0,0,0,0)
@@ -4817,7 +4659,6 @@ SearchBox.Text = ""
 SearchBox.ZIndex = 4
 Instance.new("UICorner", SearchBox).CornerRadius = UDim.new(0,8)
 
--- botão 📋
 local PickBtn = Instance.new("TextButton", SearchContainer)
 PickBtn.Size = UDim2.new(0,36,0,36)
 PickBtn.Position = UDim2.new(1,-36,0,0)
@@ -4830,11 +4671,10 @@ PickBtn.AutoButtonColor = false
 PickBtn.ZIndex = 5
 Instance.new("UICorner", PickBtn).CornerRadius = UDim.new(0,8)
 
--- ================= PICKER FRAME (DIREITA) =================
 local PickerFrame = Instance.new("Frame", MainFrame)
 PickerFrame.Size = UDim2.new(0.9,0,0.7,0)
 PickerFrame.AnchorPoint = Vector2.new(0,0.5)
-PickerFrame.Position = UDim2.new(1,12,0.5,0) -- direita
+PickerFrame.Position = UDim2.new(1,12,0.5,0)
 PickerFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 PickerFrame.Visible = false
 PickerFrame.BackgroundTransparency = 1
@@ -4842,7 +4682,6 @@ PickerFrame.ZIndex = 50
 PickerFrame.BorderSizePixel = 0
 Instance.new("UICorner", PickerFrame).CornerRadius = UDim.new(0,10)
 
--- ================= SCROLL =================
 local PickerScroll = Instance.new("ScrollingFrame", PickerFrame)
 PickerScroll.Size = UDim2.new(1,-12,1,-12)
 PickerScroll.Position = UDim2.new(0,6,0,6)
@@ -4859,7 +4698,6 @@ PickerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 	PickerScroll.CanvasSize = UDim2.new(0,0,0,PickerLayout.AbsoluteContentSize.Y + 8)
 end)
 
--- ================= ANIMAÇÕES =================
 local fadeIn = TweenService:Create(
 	PickerFrame,
 	TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
@@ -4898,7 +4736,6 @@ PickBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
--- ================= PLAYER LIST (SEM REFRESH / SEM DUP) =================
 local PlayerItems = {}
 
 local function createPlayerItem(p)
@@ -4961,36 +4798,29 @@ local function removePlayerItem(p)
 	end
 end
 
--- pega todos UMA VEZ no início
 for _,p in ipairs(Players:GetPlayers()) do
 	createPlayerItem(p)
 end
 
--- adiciona só quem entra
 Players.PlayerAdded:Connect(function(p)
 	createPlayerItem(p)
 end)
 
--- remove só quem sai
 Players.PlayerRemoving:Connect(function(p)
 	removePlayerItem(p)
 end)
 
 -- ================= END SEARCHBOX + PLAYER PICKER =================
 
-
--- Button helpers (hover enlarge + toggle green / flash blue) COM COOLDOWN
 local buttonClickCooldowns = {}
 
 local function flashBlue(btn, dur)
     if not btn or not btn.Parent then return end
     
-    -- Verificar cooldown
     if buttonClickCooldowns[btn] then
         return
     end
     
-    -- Ativar cooldown
     buttonClickCooldowns[btn] = true
     task.delay(0.3, function()
         buttonClickCooldowns[btn] = nil
@@ -4999,14 +4829,12 @@ local function flashBlue(btn, dur)
     local orig = btn.BackgroundColor3
     btn.BackgroundColor3 = Color3.fromRGB(0,150,255)
     
-    -- Garantir que a cor volte mesmo se houver erro
     local restoreColor = function()
         if btn and btn.Parent then
             btn.BackgroundColor3 = orig
         end
     end
     
-    -- Usar task.spawn para garantir restauração
     task.spawn(function()
         task.wait(dur or 0.18)
         restoreColor()
@@ -5027,7 +4855,6 @@ local function makeButton(text, sizeY)
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
     btn.ZIndex = 4
 
-    -- hover enlarge
     local normal = btn.Size
     local big = UDim2.new(normal.X.Scale, normal.X.Offset + 20, normal.Y.Scale, normal.Y.Offset + 6)
     btn.MouseEnter:Connect(function() pcall(function() btn:TweenSize(big, "Out", "Quad", 0.12, true) end) end)
@@ -5050,13 +4877,11 @@ local function makeToggle(text, sizeY)
     return btn, set, function() return state end
 end
 
--- Update player display
 local function updatePlayerDisplay(p)
     if p then
         local ok, thumb = pcall(function() return Players:GetUserThumbnailAsync(p.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420) end)
         PlayerImg.Image = (ok and thumb) and thumb or "rbxassetid://0"
         
-        -- Mostra Display Name se tiver, senão mostra o Name
         if p.DisplayName and p.DisplayName ~= p.Name then
             PlayerName.Text = p.DisplayName .. " (@" .. p.Name .. ")"
         else
@@ -5127,7 +4952,6 @@ SpeedSet.MouseButton1Click:Connect(function()
     local v = tonumber(SpeedBox.Text)
     if v then
         speedValue = v
-        -- Tenta aplicar ao humanoid atual
         if humanoid then
             humanoid.WalkSpeed = v
             print("Velocidade definida para: " .. v)
@@ -5139,7 +4963,7 @@ SpeedSet.MouseButton1Click:Connect(function()
     end
 end)
 
--- ESP single (hidden until have target)
+-- ESP single
 local ESPBtn, setESPBtnState, getESPBtnState = makeToggle("ESP Player", 34)
 ESPBtn.Visible = false
 ESPBtn.MouseButton1Click:Connect(function()
@@ -5275,25 +5099,100 @@ CustomTitle.Font = Enum.Font.GothamBold
 CustomTitle.TextSize = 14
 CustomTitle.ZIndex = 4
 
+-- ========== TEXTBOX DE PESQUISA DE BOTÕES ==========
+searchBoxCustom = Instance.new("TextBox", Content)
+searchBoxCustom.Size = UDim2.new(0.95, 0, 0, 36)
+searchBoxCustom.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+searchBoxCustom.BorderSizePixel = 0
+searchBoxCustom.Font = Enum.Font.Gotham
+searchBoxCustom.TextSize = 14
+searchBoxCustom.TextColor3 = Color3.fromRGB(200, 200, 255)
+searchBoxCustom.PlaceholderText = "Pesquisar🔎"
+searchBoxCustom.Text = ""
+searchBoxCustom.ClearTextOnFocus = false
+searchBoxCustom.ZIndex = 4
+Instance.new("UICorner", searchBoxCustom).CornerRadius = UDim.new(0, 8)
+
+local searchGlow = Instance.new("UIStroke", searchBoxCustom)
+searchGlow.Color = Color3.fromRGB(80, 80, 180)
+searchGlow.Thickness = 1
+searchGlow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+-- ========== FUNÇÃO DE PESQUISA DOS BOTÕES ==========
+local function filterCustomButtons(searchText)
+    local searchLower = string.lower(searchText or "")
+    
+    if searchLower == "" then
+        for btnName, btnFrame in pairs(customButtonFrames) do
+            if btnFrame and btnFrame.Parent then
+                btnFrame.Visible = true
+            end
+        end
+        return
+    end
+    
+    local firstVisible = nil
+    
+    for btnName, btnFrame in pairs(customButtonFrames) do
+        if btnFrame and btnFrame.Parent then
+            local btnTextLower = string.lower(btnFrame.Text)
+            if string.find(btnTextLower, searchLower, 1, true) then
+                btnFrame.Visible = true
+                if not firstVisible then
+                    firstVisible = btnFrame
+                end
+            else
+                btnFrame.Visible = false
+            end
+        end
+    end
+    
+    -- Rolar até o primeiro botão visível
+    if firstVisible then
+        task.spawn(function()
+            task.wait(0.05)
+            if firstVisible and firstVisible.Visible and firstVisible.Parent then
+                -- Força o scroll até o botão
+                Content.CanvasPosition = Vector2.new(0, firstVisible.AbsolutePosition.Y - Content.AbsolutePosition.Y + Content.CanvasPosition.Y - 60)
+            end
+        end)
+    end
+end
+
+searchBoxCustom:GetPropertyChangedSignal("Text"):Connect(function()
+    filterCustomButtons(searchBoxCustom.Text)
+end)
+
+-- ========== ATALHO Ctrl+F PARA FOCAR NA PESQUISA DE BOTÕES ==========
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        -- Ctrl+F para focar na pesquisa de botões
+        if input.KeyCode == Enum.KeyCode.F and (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)) then
+            pcall(function()
+                searchBoxCustom:CaptureFocus()
+            end)
+        end
+    end
+end)
+
 -- Criar botões personalizados
 for buttonName, buttonData in pairs(Buttons) do
     createCustomButton(buttonName, buttonData, Content)
 end
 
--- Search behavior melhorada (agora funciona com display name também)
+-- Search behavior (jogadores)
 SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
     local txt = tostring(SearchBox.Text or "")
     currentTarget = nil
     
     if txt ~= "" then
-        -- Usa a função melhorada de busca
         local foundPlayer = findPlayerByNameOrDisplayName(txt)
         if foundPlayer then
             currentTarget = foundPlayer
             trackedPlayer = foundPlayer
             updatePlayerDisplay(foundPlayer)
             
-            -- Mostra feedback no output
             print("Jogador encontrado: " .. foundPlayer.Name .. 
                 (foundPlayer.DisplayName and " (Display: " .. foundPlayer.DisplayName .. ")" or ""))
         end
@@ -5301,7 +5200,6 @@ SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
         updatePlayerDisplay(nil)
     end
     
-    -- show/hide buttons that need target
     local need = currentTarget ~= nil
     TeleToPlayer.Visible = need
     SpectateBtn.Visible = need
@@ -5309,40 +5207,82 @@ SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
     LoopTPBtn.Visible = need
 end)
 
--- Minimize key handling (local only)
+-- ========== MINIMIZE KEY (APENAS A TECLA ESCOLHIDA - CORRIGIDO) ==========
 MinimizeBox:GetPropertyChangedSignal("Text"):Connect(function()
     if #MinimizeBox.Text > 0 then
-        minimizeKey = string.sub(MinimizeBox.Text,1,1):upper()
-        MinimizeBox.Text = minimizeKey
+        local char = string.sub(MinimizeBox.Text, 1, 1)
+        -- Só aceita letras ou números
+        if string.match(char, "%w") then
+            minimizeKey = string.upper(char)
+            MinimizeBox.Text = minimizeKey
+        else
+            -- Se não for letra/número, mantém o valor anterior
+            MinimizeBox.Text = minimizeKey
+        end
     end
 end)
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    if input.UserInputType == Enum.UserInputType.Keyboard then
-        if tostring(input.KeyCode):find(minimizeKey) then MainFrame.Visible = not MainFrame.Visible end
+
+-- Conectar o evento de tecla para minimizar/restaurar
+local function onMinimizeInput(input, gameProcessed)
+    -- Não processa se o input já foi processado pelo jogo
+    if gameProcessed then return end
+    
+    -- Só processa teclas do teclado
+    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+    
+    -- Obtém o nome da tecla pressionada
+    local keyPressed = input.KeyCode.Name
+    
+    -- Verifica se a tecla pressionada é exatamente a tecla de atalho
+    if string.upper(keyPressed) == minimizeKey then
+        -- Verifica se NÃO estamos digitando em nenhuma textbox
+        local focusedTextBox = nil
+        pcall(function()
+            focusedTextBox = UserInputService:GetFocusedTextBox()
+        end)
+        
+        -- Só minimiza/restaura se NÃO estiver focado em uma textbox
+        if not focusedTextBox then
+            MainFrame.Visible = not MainFrame.Visible
+            print("TrollGui " .. (MainFrame.Visible and "Restaurado" or "Minimizado") .. " com tecla: " .. minimizeKey)
+        end
     end
-end)
+end
+
+-- Remover qualquer conexão antiga
+if _G.trollGuiMinimizeConnection then
+    pcall(function()
+        _G.trollGuiMinimizeConnection:Disconnect()
+    end)
+    _G.trollGuiMinimizeConnection = nil
+end
+
+-- Criar nova conexão
+_G.trollGuiMinimizeConnection = UserInputService.InputBegan:Connect(onMinimizeInput)
 
 -- Initialize UI visuals
 setESPAllVisual(allEspEnabled)
 
 -- Cleanup on destroy
 MainFrame.Destroying:Connect(function()
-    -- disconnect all stored connections
+    -- Desconectar tecla de atalho
+    if _G.trollGuiMinimizeConnection then
+        pcall(function() _G.trollGuiMinimizeConnection:Disconnect() end)
+        _G.trollGuiMinimizeConnection = nil
+    end
+    
     for k, conn in pairs(connections) do
         if conn and type(conn) == "userdata" and conn.Disconnect then
             pcall(function() conn:Disconnect() end)
         end
     end
     
-    -- desconectar loops dos botões personalizados
     for btnName, conn in pairs(buttonConnections) do
         if conn and type(conn) == "userdata" then
             pcall(function() conn:Disconnect() end)
         end
     end
     
-    -- also try disconnecting named connections
     for _, name in pairs({"espAll","loop"}) do
         if connections[name] and type(connections[name]) == "userdata" then
             pcall(function() connections[name]:Disconnect() end)
@@ -5371,10 +5311,8 @@ do
     UIS.InputBegan:Connect(function(input, gpe)
         if gpe then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            -- If clicked an interactive child, don't start drag
             local target = input.Target
             if target and isInteractive(target) then return end
-            -- Check inside MainFrame bounds
             local mloc = UIS:GetMouseLocation()
             local ap = MainFrame.AbsolutePosition
             local asz = MainFrame.AbsoluteSize
@@ -5463,6 +5401,6 @@ _G.MouseUnlockToggle = ContextActionService:BindActionAtPriority(
     onEnter,
     false,
     Enum.ContextActionPriority.High.Value,
-    Enum.KeyCode.Return,       -- Enter normal
-    Enum.KeyCode.KeypadEnter   -- Enter do numpad
+    Enum.KeyCode.Return,
+    Enum.KeyCode.KeypadEnter
 )
