@@ -4472,6 +4472,20 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(0,0,0)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 
+-- Adicione isso depois de criar o MainFrame (por volta da linha 765)
+-- Aplicar cantos arredondados e borda no MainFrame
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)  -- 12 pixels de arredondamento
+UICorner.Parent = MainFrame
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 2
+UIStroke.Color = Color3.fromRGB(0, 0, 0)  -- Azul claro
+UIStroke.Transparency = 0.2
+UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+UIStroke.Parent = MainFrame
+
 local Title = Instance.new("TextLabel")
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1,0,0,40)
