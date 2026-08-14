@@ -4,8 +4,7 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
-
--- ========== LOCAL BUTTONS ==========
+-- ========== BOTÕES ==========
 -- Meus BOTÕES AQUI ↓↓↓
 local Buttons = {
 	UmBotaoImcomum = {
@@ -23,7 +22,6 @@ local Buttons = {
             Saved = {}
         }
 
-        -- Save original values once
         if not getgenv().FullBright.Saved.Done then
             local s = getgenv().FullBright.Saved
             s.GlobalShadows = Lighting.GlobalShadows
@@ -55,10 +53,8 @@ local Buttons = {
         end
 
         if state then
-            print("FullBright ENABLED")
-            getgenv().FullBright.Enabled = true
+                        getgenv().FullBright.Enabled = true
 
-            -- force every frame (anti game override)
             getgenv().FullBright.Conn = RunService.RenderStepped:Connect(function()
                 if not getgenv().FullBright.Enabled then return end
 
@@ -81,8 +77,7 @@ local Buttons = {
             end)
 
         else
-            print("FullBright DISABLED")
-            getgenv().FullBright.Enabled = false
+                        getgenv().FullBright.Enabled = false
 
             if getgenv().FullBright.Conn then
                 getgenv().FullBright.Conn:Disconnect()
@@ -120,7 +115,6 @@ local Buttons = {
 	Repeat = false,
 	Script = function(state)
 
-		-- SERVIÇOS
 		local UserInputService = game:GetService("UserInputService")
 		local RunService = game:GetService("RunService")
 		local Players = game:GetService("Players")
@@ -128,13 +122,11 @@ local Buttons = {
 		local player = Players.LocalPlayer
 		local camera = workspace.CurrentCamera
 
-		-- CONFIG
 		local SPEED = 40
 		local SLOW = 0.3
 		local FAST = 3
 		local SENS = 0.18
 
-		-- VARIÁVEIS PERSISTENTES (IMPORTANTE)
 		_G.__FREECAM = _G.__FREECAM or {
 			active = false,
 			yaw = 0,
@@ -145,7 +137,6 @@ local Buttons = {
 
 		local FC = _G.__FREECAM
 
-		-- FUNÇÕES INTERNAS
 		local function anchorChar(v)
 			local c = player.Character
 			if c then
@@ -161,9 +152,6 @@ local Buttons = {
 			FC.connections = {}
 		end
 
-		--------------------------------------------------
-		-- ATIVAR
-		--------------------------------------------------
 		if state and not FC.active then
 			FC.active = true
 
@@ -236,9 +224,6 @@ local Buttons = {
 						* camRot.Rotation
 				end)
 
-		--------------------------------------------------
-		-- DESATIVAR
-		--------------------------------------------------
 		elseif not state and FC.active then
 			FC.active = false
 
@@ -255,7 +240,6 @@ local Buttons = {
 	end
 },
 
-    -- Botão normal (não toggle)
 BotaoComumente = {
     Nome = "First Person",
     IsToggle = true,
@@ -267,7 +251,6 @@ BotaoComumente = {
         local cam = workspace.CurrentCamera
         local uis = game:GetService("UserInputService")
 
-        -- Salvar configurações originais apenas uma vez
         if not getgenv().OriginalCameraSettings then
             getgenv().OriginalCameraSettings = {
                 CameraMode = player.CameraMode,
@@ -277,14 +260,13 @@ BotaoComumente = {
         end
 
         if state then
-            -- ATIVAR FIRST PERSON FIXA
+
             player.CameraMode = Enum.CameraMode.LockFirstPerson
             cam.CameraType = Enum.CameraType.Custom
             uis.MouseBehavior = Enum.MouseBehavior.LockCenter
 
-            print(">> FIRST PERSON FIX ATIVADO")
-        else
-            -- DESATIVAR E RESTAURAR CONFIGURAÇÕES
+                    else
+
             player.CameraMode = getgenv().OriginalCameraSettings.CameraMode
             cam.CameraType = getgenv().OriginalCameraSettings.CameraType
             uis.MouseBehavior = getgenv().OriginalCameraSettings.MouseBehavior
@@ -292,8 +274,6 @@ BotaoComumente = {
     end
 },
 
-    
-    -- Botão toggle COM repeat (loop)
 BotaoCapitalista = {
     Nome = "Delete Part (X)",
     IsToggle = true,
@@ -305,51 +285,41 @@ BotaoCapitalista = {
         local player = Players.LocalPlayer
         local mouse = player:GetMouse()
 
-        -- Criar a conexão apenas uma vez
         if not getgenv().DeleteConnection then
             getgenv().DeleteConnection = UIS.InputBegan:Connect(function(input, gpe)
                 if gpe then return end
 
-                -- Só funciona se o modo estiver ligado
                 if getgenv().DeletePartModeState then
                     if input.KeyCode == Enum.KeyCode.X then
                         local target = mouse.Target
                         if target and target:IsA("BasePart") then
                             target:Destroy()
-                            print(">> Parte deletada:", target.Name)
-                        end
+                                                    end
                     end
                 end
             end)
         end
 
-        -- Atualizar estado global
         getgenv().DeletePartModeState = state
 
         if state then
-            print(">> MODO DELETAR ATIVADO (pressione X para deletar partes)")
-        else
-            print(">> MODO DELETAR DESATIVADO")
-        end
+                    end
     end
 },
 
-    
-    -- Outro botão normal
 MeuBotaoExtra = {
     Nome = "SpinFling",
     IsToggle = true,
     Repeat = false,
 
     Script = function(state)
-        -- Serviços
+
         local Players = game:GetService("Players")
         local RunService = game:GetService("RunService")
 
         local player = Players.LocalPlayer
         if not player then return end
 
-        -- garantir storage global
         if not getgenv().SpinFlingData then
             getgenv().SpinFlingData = {
                 TouchedConnection = nil,
@@ -358,19 +328,16 @@ MeuBotaoExtra = {
             }
         end
 
-        -- parâmetros (ajuste aqui se quiser)
-        local ROTATION_SPEED = 2200      -- graus por segundo (muito rápido). Ajuste se necessário.
-        local PUSH_FORCE = 200           -- força aplicada ao humanoidrootpart do outro jogador
-        local INCLUDE_UP = true          -- adiciona componente vertical ao push
+        local ROTATION_SPEED = 2200
+        local PUSH_FORCE = 200
+        local INCLUDE_UP = true
 
-        -- função para pegar HRP atual (tenta esperar caso character não exista)
         local function getHRP()
             local char = player.Character or player.CharacterAdded:Wait()
             local hrp = char:FindFirstChild("HumanoidRootPart")
             return hrp, char
         end
 
-        -- função que aplica push no alvo
         local function pushAway(hrpOwn, hitPart)
             if not hitPart or not hitPart.Parent then return end
             local otherChar = hitPart:FindFirstAncestorOfClass("Model")
@@ -379,10 +346,10 @@ MeuBotaoExtra = {
             local otherHRP = otherChar:FindFirstChild("HumanoidRootPart")
             local otherHum = otherChar:FindFirstChildOfClass("Humanoid")
             if otherHRP and otherHum then
-                -- calcula direção do push (do seu hrp para o outro)
+
                 local dir = (otherHRP.Position - hrpOwn.Position)
                 if dir.Magnitude <= 0.001 then
-                    -- se muito próximo, empurra na direção do hit normal (fallback)
+
                     dir = (otherHRP.CFrame.p - hrpOwn.CFrame.p)
                 end
                 local forceDir = dir.Unit
@@ -390,12 +357,10 @@ MeuBotaoExtra = {
                     forceDir = (forceDir + Vector3.new(0, 0.5, 0)).Unit
                 end
 
-                -- aplicar velocidade (assign direto)
-                -- multiplicador pode ser aumentado
                 local pushVelocity = forceDir * PUSH_FORCE
-                -- proteção: só aplica se o objeto ainda existir
+
                 if otherHRP and otherHRP.Parent then
-                    -- tentativa de causar o efeito imediatamente
+
                     pcall(function()
                         otherHRP.Velocity = pushVelocity
                     end)
@@ -404,18 +369,13 @@ MeuBotaoExtra = {
         end
 
         if state then
-            -- LIGAR
-            print("SPIN FLING LIGADO")
 
-            -- obter hrp e armazenar
             local hrp, char = getHRP()
             if not hrp then
-                warn("Não foi possível obter HumanoidRootPart.")
-                return
+                                return
             end
             getgenv().SpinFlingData.HRP = hrp
 
-            -- garantir que conexões anteriores (se houver) foram desconectadas
             if getgenv().SpinFlingData.TouchedConnection then
                 pcall(function() getgenv().SpinFlingData.TouchedConnection:Disconnect() end)
                 getgenv().SpinFlingData.TouchedConnection = nil
@@ -425,30 +385,27 @@ MeuBotaoExtra = {
                 getgenv().SpinFlingData.RenderConn = nil
             end
 
-            -- Conexão Touched: quando alguém encostar no seu HRP, é empurrado
             getgenv().SpinFlingData.TouchedConnection = hrp.Touched:Connect(function(hit)
-                -- evita tocar em partes do próprio personagem
+
                 if not hit or not hit.Parent then return end
                 if hit:IsDescendantOf(char) then return end
-                -- só faz se for BasePart
+
                 if not hit:IsA("BasePart") then return end
 
-                -- aplica push
                 pcall(function()
                     pushAway(hrp, hit)
                 end)
             end)
 
-            -- Conexão RenderStepped: gira o HRP constantemente
             local last = tick()
             getgenv().SpinFlingData.RenderConn = RunService.RenderStepped:Connect(function(dt)
-                -- atualizar hrp caso tenha respawnado
+
                 if not getgenv().SpinFlingData.HRP or not getgenv().SpinFlingData.HRP.Parent then
                     local ok, newhrp = pcall(getHRP)
                     if ok and newhrp then
                         getgenv().SpinFlingData.HRP = newhrp
                         hrp = newhrp
-                        -- reconectar touched
+
                         if getgenv().SpinFlingData.TouchedConnection then
                             pcall(function() getgenv().SpinFlingData.TouchedConnection:Disconnect() end)
                             getgenv().SpinFlingData.TouchedConnection = nil
@@ -461,38 +418,32 @@ MeuBotaoExtra = {
                     end
                 end
 
-                -- realizar rotação visual do HRP (mantendo posição)
                 local currentHRP = getgenv().SpinFlingData.HRP
                 if currentHRP and currentHRP.Parent then
-                    -- graus por segundo -> radianos por segundo
+
                     local angDeg = ROTATION_SPEED * dt
                     local angRad = math.rad(angDeg)
-                    -- rotaciona em Y local
+
                     local cf = currentHRP.CFrame
                     local pos = cf.Position
                     local rot = cf - cf.Position
-                    -- aplicar rotação incremental ao redor do eixo Y
+
                     currentHRP.CFrame = CFrame.new(pos) * CFrame.Angles(0, angRad, 0) * rot
                 end
             end)
 
         else
-            -- DESLIGAR
-            print("SPIN FLING DESLIGADO")
 
-            -- desconectar touched
             if getgenv().SpinFlingData.TouchedConnection then
                 pcall(function() getgenv().SpinFlingData.TouchedConnection:Disconnect() end)
                 getgenv().SpinFlingData.TouchedConnection = nil
             end
 
-            -- desconectar renderstepped (para parar de girar)
             if getgenv().SpinFlingData.RenderConn then
                 pcall(function() getgenv().SpinFlingData.RenderConn:Disconnect() end)
                 getgenv().SpinFlingData.RenderConn = nil
             end
 
-            -- limpar referência HRP
             getgenv().SpinFlingData.HRP = nil
         end
     end
@@ -503,7 +454,6 @@ InvisibleDummyTools = {
     IsToggle = false,
     Repeat = false,
     Script = function(state)
--- Universe / Places Viewer (AssetService + efeitos) - COMPACTO
 
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
@@ -516,8 +466,6 @@ local player = Players.LocalPlayer
 pcall(function()
     CoreGui:FindFirstChild("UniverseViewer"):Destroy()
 end)
-
--- ================= GUI =================
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "UniverseViewer"
@@ -536,14 +484,11 @@ Main.Draggable = true
 Main.ZIndex = 10
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
 
--- >>> BORDA BRANCA DO FRAME PRINCIPAL <<<
 local MainStroke = Instance.new("UIStroke")
 MainStroke.Parent = Main
 MainStroke.Color = Color3.fromRGB(255,255,255)
 MainStroke.Thickness = 1
 MainStroke.LineJoinMode = Enum.LineJoinMode.Round
-
--- ================= TOPO =================
 
 local TopBar = Instance.new("Frame", Main)
 TopBar.Size = UDim2.new(1,0,0,44)
@@ -562,7 +507,6 @@ Title.TextColor3 = Color3.new(1,1,1)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.ZIndex = 12
 
-
 local Close = Instance.new("TextButton", TopBar)
 Close.Size = UDim2.new(0,34,0,26)
 Close.Position = UDim2.new(1,-38,0.5,-13)
@@ -578,8 +522,6 @@ Close.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- ================= SEARCH =================
-
 local SearchBox = Instance.new("TextBox", Main)
 SearchBox.Position = UDim2.new(0,8,0,52)
 SearchBox.Size = UDim2.new(1,-16,0,34)
@@ -593,8 +535,6 @@ SearchBox.PlaceholderColor3 = Color3.fromRGB(150,150,150)
 SearchBox.BackgroundColor3 = Color3.fromRGB(34,34,34)
 SearchBox.ZIndex = 11
 Instance.new("UICorner", SearchBox).CornerRadius = UDim.new(0,8)
-
--- ================= SCROLL =================
 
 local Scroll = Instance.new("ScrollingFrame", Main)
 Scroll.Position = UDim2.new(0,8,0,94)
@@ -611,8 +551,6 @@ Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     Scroll.CanvasSize = UDim2.new(0,0,0, Layout.AbsoluteContentSize.Y + 8)
 end)
 
--- ================= FUNÇÕES =================
-
 local Buttons = {}
 
 local function Tween(obj, t, props)
@@ -622,8 +560,6 @@ local function Tween(obj, t, props)
         props
     ):Play()
 end
-
--- ================= BOTÃO PLACE =================
 
 local NORMAL_COLOR = Color3.fromRGB(48,48,48)
 local HOVER_COLOR  = Color3.fromRGB(60,60,60)
@@ -642,7 +578,6 @@ local function PlaceButton(name, id)
     b.ZIndex = 12
     Instance.new("UICorner", b).CornerRadius = UDim.new(0,8)
 
-    -- >>> BORDA PRETA FINA NO BOTÃO <<<
     local stroke = Instance.new("UIStroke")
     stroke.Parent = b
     stroke.Color = Color3.fromRGB(0,0,0)
@@ -662,7 +597,6 @@ local function PlaceButton(name, id)
         Tween(b,0.1,{BackgroundColor3 = NORMAL_COLOR})
     end)
 
-    -- TELEPORT
     b.MouseButton1Click:Connect(function()
         Tween(b,0.08,{BackgroundColor3 = CLICK_COLOR})
         task.wait(0.12)
@@ -670,7 +604,6 @@ local function PlaceButton(name, id)
         TeleportService:Teleport(id, player)
     end)
 
-    -- COPIAR PLACEID
     b.MouseButton2Click:Connect(function()
         if setclipboard then
             setclipboard(tostring(id))
@@ -687,8 +620,6 @@ local function PlaceButton(name, id)
     end)
 end
 
--- ================= LOAD PLACES =================
-
 local ok, pages = pcall(function()
     return AssetService:GetGamePlacesAsync()
 end)
@@ -703,8 +634,6 @@ if ok and pages then
     end
 end
 
--- ================= FILTRO =================
-
 SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
     local txt = string.lower(SearchBox.Text or "")
     for btn,data in pairs(Buttons) do
@@ -715,9 +644,6 @@ end)
     end
 },
 
--- =========================
--- Botão: Noclip (State)
--- =========================
 NoclipButton = {
     Nome = "Noclip",
     IsToggle = true,
@@ -731,7 +657,6 @@ NoclipButton = {
 
         local char = player.Character or player.CharacterAdded:Wait()
 
-        -- preparar storage global
         if not getgenv().NoclipData then
             getgenv().NoclipData = {
                 Conn = nil,
@@ -739,7 +664,6 @@ NoclipButton = {
             }
         end
 
-        -- backup das colisões (apenas uma vez por parte)
         local function backupCollisionsOnce()
             if next(getgenv().NoclipData.CollisionBackup) then return end
             for _, p in ipairs(char:GetDescendants()) do
@@ -766,33 +690,27 @@ NoclipButton = {
             end
         end
 
-        -- STATE action
         if state then
-            print(">> [Noclip] ATIVADO")
-            char = player.Character or player.CharacterAdded:Wait()
+                        char = player.Character or player.CharacterAdded:Wait()
             backupCollisionsOnce()
 
-            -- desconectar se já tinha
             if getgenv().NoclipData.Conn then
                 pcall(function() getgenv().NoclipData.Conn:Disconnect() end)
                 getgenv().NoclipData.Conn = nil
             end
 
-            -- criar conexão que força CanCollide = false a cada Stepped (mais seguro que one-shot)
             getgenv().NoclipData.Conn = RunService.Stepped:Connect(function()
                 if not player.Character then return end
                 disableCollisionsNow(player.Character)
             end)
 
         else
-            print(">> [Noclip] DESATIVADO")
-            -- desconectar loop
+
             if getgenv().NoclipData.Conn then
                 pcall(function() getgenv().NoclipData.Conn:Disconnect() end)
                 getgenv().NoclipData.Conn = nil
             end
 
-            -- restaurar colisões
             restoreCollisionsFromBackup()
         end
     end
@@ -809,10 +727,7 @@ TeleportClick = {
         getgenv().TPClickState = state
 
         if state then
-            print("Teleport Click ATIVADO")
-        else
-            print("Teleport Click DESATIVADO")
-        end
+                    end
 
         if not getgenv().TPClickConnection then
             getgenv().TPClickConnection = mouse.Button1Down:Connect(function()
@@ -828,18 +743,14 @@ TeleportClick = {
                 local hit = mouse.Hit
                 if not hit then return end
 
-                -- posição limpa (SEM rotação da superfície)
                 local pos = hit.Position + Vector3.new(0, 3, 0)
 
-                -- pega só a rotação Y atual do jogador
                 local _, y, _ = hrp.CFrame:ToEulerAnglesYXZ()
 
-                -- força estado normal (evita ragdoll)
                 humanoid.PlatformStand = false
                 humanoid:ChangeState(Enum.HumanoidStateType.Running)
                 humanoid.AutoRotate = true
 
-                -- aplica teleport LIMPO
                 hrp.CFrame = CFrame.new(pos) * CFrame.Angles(0, y, 0)
             end)
         end
@@ -858,15 +769,10 @@ FreezeMode = {
 
         if not hum or not hrp then return end
 
-        -- tabela global
         getgenv().FREEZEMODE = getgenv().FREEZEMODE or {}
 
         if state == true then
-            -----------------------------------------------------------------
-            -- ATIVAR FREEZE MODE
-            -----------------------------------------------------------------
 
-            -- salva estado original
             FREEZEMODE.savedCF = hrp.CFrame
             FREEZEMODE.savedAutoRotate = hum.AutoRotate
             FREEZEMODE.savedJumpPower = hum.JumpPower
@@ -886,18 +792,13 @@ FreezeMode = {
             end)
 
         else
-            -----------------------------------------------------------------
-            -- DESATIVAR FREEZE MODE
-            -----------------------------------------------------------------
 
             FREEZEMODE.run = false
 
-            -- restaura tudo corretamente
             hum.AutoRotate = FREEZEMODE.savedAutoRotate ~= false
             hum.UseJumpPower = FREEZEMODE.savedUseJumpPower ~= false
             hum.JumpPower = FREEZEMODE.savedJumpPower or 50
 
-            -- força estado válido (isso corrige o bug de não pular)
             hum.PlatformStand = false
             hum:ChangeState(Enum.HumanoidStateType.GettingUp)
             task.wait()
@@ -919,7 +820,6 @@ BotaoTesteReentrar = {
         local player = Players.LocalPlayer
         local placeId = game.PlaceId
 
-        -- Reentrar na mesma experiência
         TeleportService:Teleport(placeId, player)
 
     end
@@ -937,7 +837,7 @@ BotaoTesteMorrer = {
 
         if humanoid then
             humanoid.Health = 0
-            -- ou: humanoid:TakeDamage(999999)
+
         end
 
     end
@@ -949,7 +849,7 @@ InfiniteJump = {
     Script = function(state)
         local UIS = game:GetService("UserInputService")
         local player = game.Players.LocalPlayer
-        
+
         if state then
             getgenv().InfiniteJumpConn = UIS.JumpRequest:Connect(function()
                 local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
@@ -965,20 +865,19 @@ InfiniteJump = {
         end
     end
 },
-			    -- Botão teste
+
     walkfling = {
         Nome = "WalkFling",
         IsToggle = false,
         Repeat = false,
         Script = function()
---// SERVICES
+
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 
---// GUI PARENT
 local function getGuiParent()
     if gethui then
         return gethui()
@@ -987,7 +886,6 @@ local function getGuiParent()
     end
 end
 
---// GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "TrollGuiUIJosue"
 screenGui.ResetOnSpawn = false
@@ -1000,7 +898,6 @@ pcall(function()
     end
 end)
 
---// FRAME
 local frame = Instance.new("Frame", screenGui)
 frame.Size = UDim2.new(0, 220, 0, 140)
 frame.Position = UDim2.new(0.4, 0, 0.4, 0)
@@ -1013,14 +910,12 @@ local frameStroke = Instance.new("UIStroke", frame)
 frameStroke.Color = Color3.fromRGB(255,255,255)
 frameStroke.Thickness = 3
 
---// TOP BAR
 local top = Instance.new("Frame", frame)
 top.Size = UDim2.new(1,0,0,30)
 top.BackgroundColor3 = Color3.fromRGB(70,70,70)
 
 Instance.new("UICorner", top)
 
---// TITLE
 local title = Instance.new("TextLabel", top)
 title.Size = UDim2.new(1,-40,1,0)
 title.Position = UDim2.new(0,10,0,0)
@@ -1033,7 +928,6 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 
 Instance.new("UICorner", title)
 
---// CLOSE BUTTON
 local close = Instance.new("TextButton", top)
 close.Size = UDim2.new(0,25,0,25)
 close.Position = UDim2.new(1,-30,0.1,0)
@@ -1043,7 +937,6 @@ close.TextColor3 = Color3.fromRGB(255,255,255)
 
 Instance.new("UICorner", close)
 
---// TOGGLE
 local toggle = Instance.new("TextButton", frame)
 toggle.Size = UDim2.new(0,160,0,50)
 toggle.Position = UDim2.new(0.5,-80,0.55,-10)
@@ -1055,10 +948,8 @@ toggle.TextSize = 20
 
 Instance.new("UICorner", toggle)
 
---// ESTADO
 local flingOn = false
 
---// FLING ORIGINAL (SÓ MELHORADO)
 local function fling()
     local lp = player
     local movel = 0.1
@@ -1072,7 +963,6 @@ local function fling()
         if hrp then
             local vel = hrp.Velocity
 
-            -- MAIS FORTE + MAIS FÁCIL DE ENCOSTAR
             hrp.Velocity = vel * 8000 + Vector3.new(0, 8000, 0)
 
             RunService.RenderStepped:Wait()
@@ -1086,7 +976,6 @@ local function fling()
     end
 end
 
---// TOGGLE CLICK
 toggle.MouseButton1Click:Connect(function()
     flingOn = not flingOn
 
@@ -1101,7 +990,6 @@ toggle.MouseButton1Click:Connect(function()
     end
 end)
 
---// CLOSE LOGIC
 close.MouseButton1Click:Connect(function()
     if not flingOn then
         screenGui:Destroy()
@@ -1116,7 +1004,7 @@ close.MouseButton1Click:Connect(function()
 end)
         end
     },
--- Botão teste
+
 BotaoTesteCoords = {
     Nome = "Coordinates",
     IsToggle = true,
@@ -1130,22 +1018,17 @@ BotaoTesteCoords = {
         local player = Players.LocalPlayer
         local playerGui = player:WaitForChild("PlayerGui")
 
-        -- ===== OFF =====
         local oldGui = playerGui:FindFirstChild("CoordinatesUI")
         if oldGui then
             oldGui:Destroy()
             return
         end
 
-        -- ===== ON =====
-
-        -- ScreenGui
         local gui = Instance.new("ScreenGui")
         gui.Name = "CoordinatesUI"
         gui.ResetOnSpawn = false
         gui.Parent = playerGui
 
-        -- Frame
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(0, 260, 0, 150)
         frame.Position = UDim2.new(0.5, -130, 0.4, 0)
@@ -1155,7 +1038,6 @@ BotaoTesteCoords = {
 
         Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 
-        -- Title
         local title = Instance.new("TextLabel")
         title.Size = UDim2.new(1, -10, 0, 30)
         title.Position = UDim2.new(0, 5, 0, 5)
@@ -1166,7 +1048,6 @@ BotaoTesteCoords = {
         title.TextSize = 16
         title.Parent = frame
 
-        -- Coordinates Label
         local coordsLabel = Instance.new("TextLabel")
         coordsLabel.Size = UDim2.new(1, -10, 0, 60)
         coordsLabel.Position = UDim2.new(0, 5, 0, 40)
@@ -1179,7 +1060,6 @@ BotaoTesteCoords = {
         coordsLabel.TextSize = 14
         coordsLabel.Parent = frame
 
-        -- Copy Button
         local copyButton = Instance.new("TextButton")
         copyButton.Size = UDim2.new(0.5, -10, 0, 30)
         copyButton.Position = UDim2.new(0.25, 0, 1, -40)
@@ -1192,7 +1072,6 @@ BotaoTesteCoords = {
 
         Instance.new("UICorner", copyButton).CornerRadius = UDim.new(0, 8)
 
-        -- ===== Atualização das coordenadas =====
         local updateConnection
         updateConnection = RunService.RenderStepped:Connect(function()
             local char = player.Character
@@ -1204,7 +1083,6 @@ BotaoTesteCoords = {
             end
         end)
 
-        -- ===== Copiar =====
         copyButton.MouseButton1Click:Connect(function()
             if setclipboard then
                 setclipboard(coordsLabel.Text:gsub("\n", " | "))
@@ -1214,7 +1092,6 @@ BotaoTesteCoords = {
             end
         end)
 
-        -- ===== Arrastar GUI =====
         local dragging = false
         local dragStart, startPos
 
@@ -1244,7 +1121,6 @@ BotaoTesteCoords = {
             end
         end)
 
-        -- ===== Cleanup ao desligar =====
         gui.Destroying:Connect(function()
             if updateConnection then
                 updateConnection:Disconnect()
@@ -1281,7 +1157,6 @@ EgorMode = {
 
             egor.OriginalSpeeds = {}
 
-            -- acelera TODAS as animações atuais
             for _, track in ipairs(egor.Animator:GetPlayingAnimationTracks()) do
                 if not egor.OriginalSpeeds[track] then
                     egor.OriginalSpeeds[track] = track.Speed
@@ -1289,7 +1164,6 @@ EgorMode = {
                 track:AdjustSpeed(SPEED_MULT)
             end
 
-            -- mantém acelerado + pega animações novas
             egor.Connection = RunService.Heartbeat:Connect(function()
                 if not egor.Animator then return end
 
@@ -1301,16 +1175,13 @@ EgorMode = {
                 end
             end)
 
-            -- reaplica ao respawn
             egor.CharConn = player.CharacterAdded:Connect(function(char)
                 task.wait(0.2)
                 setupCharacter(char)
             end)
 
-            print(">> Egor Mode ATIVADO")
-
         else
-            -- restaurar TODAS as velocidades
+
             if egor.OriginalSpeeds then
                 for track, speed in pairs(egor.OriginalSpeeds) do
                     if track then
@@ -1333,8 +1204,7 @@ EgorMode = {
                 egor.CharConn = nil
             end
 
-            print(">> Egor Mode DESATIVADO")
-        end
+                    end
     end
 },
 FakeDeath = {
@@ -1348,7 +1218,6 @@ FakeDeath = {
 
         local player = Players.LocalPlayer
 
-        -- Variáveis globais seguras
         getgenv()._FakeDeath = getgenv()._FakeDeath or {}
         local fd = getgenv()._FakeDeath
 
@@ -1362,25 +1231,20 @@ FakeDeath = {
 
             local char, humanoid, rootPart = getCharacter()
 
-            -- Avisar servidor (se existir)
             if ReplicatedStorage:FindFirstChild("KauaRemote") then
                 pcall(function()
                     ReplicatedStorage.KauaRemote:FireServer("fakeDeath", true)
                 end)
             end
 
-            -- Salvar estado
             fd.OriginalHealth = humanoid.Health
             fd.OriginalCollisions = {}
 
-            -- Ativar fake ragdoll
             humanoid.PlatformStand = true
 
-            -- Queda leve natural
             rootPart.Velocity = Vector3.new(0, -15, 0)
             rootPart.RotVelocity = Vector3.new(1, 0, 1)
 
-            -- Manter colisão ligada (anti-bug)
             for _, part in ipairs(char:GetDescendants()) do
                 if part:IsA("BasePart") then
                     fd.OriginalCollisions[part] = part.CollisionGroupId
@@ -1388,7 +1252,6 @@ FakeDeath = {
                 end
             end
 
-            -- Garantir que PlatformStand não desligue
             fd.Connection = RunService.Heartbeat:Connect(function()
                 if humanoid and humanoid.Parent then
                     if not humanoid.PlatformStand then
@@ -1397,30 +1260,25 @@ FakeDeath = {
                 end
             end)
 
-            print(">> Fake Death ENABLED")
-
         else
-            -- Avisar servidor
+
             if ReplicatedStorage:FindFirstChild("KauaRemote") then
                 pcall(function()
                     ReplicatedStorage.KauaRemote:FireServer("fakeDeath", false)
                 end)
             end
 
-            -- Parar loop
             if fd.Connection then
                 fd.Connection:Disconnect()
                 fd.Connection = nil
             end
 
-            -- Restaurar personagem
             if player.Character then
                 local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
 
                 if humanoid then
                     humanoid.PlatformStand = false
 
-                    -- Restaurar colisões
                     if fd.OriginalCollisions then
                         for part, group in pairs(fd.OriginalCollisions) do
                             if part and part.Parent then
@@ -1431,14 +1289,12 @@ FakeDeath = {
 
                     fd.OriginalCollisions = {}
 
-                    -- Levantar personagem
                     task.wait(0.1)
                     humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
                 end
             end
 
-            print(">> Fake Death DISABLED")
-        end
+                    end
     end
 },
 FakeDeath2 = {
@@ -1457,11 +1313,9 @@ FakeDeath2 = {
         local root = character:WaitForChild("HumanoidRootPart")
         local camera = workspace.CurrentCamera
 
-        -- track state
         getgenv().CFlyData = getgenv().CFlyData or {}
         local data = getgenv().CFlyData
 
-        -- movement state
         data.Keys = {W=false, A=false, S=false, D=false, Up=false, Down=false}
         local speed = data.Speed or 60
 
@@ -1499,21 +1353,18 @@ FakeDeath2 = {
                 direction = direction.Unit
             end
 
-            -- set CFrame position
             root.CFrame = root.CFrame + direction * speed * dt
         end
 
         if state then
-            print("")
-            humanoid.PlatformStand = true
+                        humanoid.PlatformStand = true
 
             data.InputBegan = UserInputService.InputBegan:Connect(onInputBegan)
             data.InputEnded = UserInputService.InputEnded:Connect(onInputEnded)
             data.RenderStep = RunService.RenderStepped:Connect(flyStep)
 
         else
-            print("")
-            humanoid.PlatformStand = false
+                        humanoid.PlatformStand = false
 
             if data.InputBegan then data.InputBegan:Disconnect() end
             if data.InputEnded then data.InputEnded:Disconnect() end
@@ -1584,10 +1435,9 @@ CframeFly = {
                 end)
             end
 
-            -- VELOCIDADES
             fly.BaseSpeed = 60
-            fly.FastMultiplier = 2.2   -- CTRL
-            fly.SlowMultiplier = 0.4   -- SHIFT
+            fly.FastMultiplier = 2.2
+            fly.SlowMultiplier = 0.4
 
             fly.Velocity = Vector3.zero
             fly.LastTick = tick()
@@ -1604,7 +1454,6 @@ CframeFly = {
                 local moveDir = Vector3.zero
                 local hasInput = false
 
-                -- MOVIMENTO RELATIVO À CÂMERA
                 if UserInputService:IsKeyDown(Enum.KeyCode.W) then
                     moveDir += camCF.LookVector
                     hasInput = true
@@ -1626,7 +1475,6 @@ CframeFly = {
                     moveDir = moveDir.Unit
                 end
 
-                -- MODIFICADOR DE VELOCIDADE
                 local speed = fly.BaseSpeed
 
                 if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
@@ -1643,14 +1491,12 @@ CframeFly = {
 
                 local newPos = root.Position + (fly.Velocity * dt)
 
-                -- FIX DO CAIR LENTO (só quando parado)
                 if not hasInput then
                     newPos = Vector3.new(newPos.X, fly.LockedY, newPos.Z)
                 else
                     fly.LockedY = newPos.Y
                 end
 
-                -- ROTACIONA APENAS NO Y (igual original)
                 local look = camCF.LookVector
                 local flatLook = Vector3.new(look.X, 0, look.Z)
 
@@ -1696,14 +1542,13 @@ BotaoTesteX = {
     Script = function(State)
         local ProximityPromptService = game:GetService("ProximityPromptService")
 
-        -- tabela de backup dos valores originais
         _G.PromptBackup = _G.PromptBackup or {}
 
         if State then
-            -- ===== ON =====
+
             for _, prompt in ipairs(game:GetDescendants()) do
                 if prompt:IsA("ProximityPrompt") then
-                    -- salva valores originais apenas 1 vez
+
                     if not _G.PromptBackup[prompt] then
                         _G.PromptBackup[prompt] = {
                             HoldDuration = prompt.HoldDuration,
@@ -1716,7 +1561,6 @@ BotaoTesteX = {
                 end
             end
 
-            -- aplica também em prompts criados depois
             _G.PromptConn = game.DescendantAdded:Connect(function(obj)
                 if obj:IsA("ProximityPrompt") then
                     _G.PromptBackup[obj] = {
@@ -1730,13 +1574,12 @@ BotaoTesteX = {
             end)
 
         else
-            -- ===== OFF =====
+
             if _G.PromptConn then
                 _G.PromptConn:Disconnect()
                 _G.PromptConn = nil
             end
 
-            -- restaura valores originais
             for prompt, data in pairs(_G.PromptBackup) do
                 if prompt and prompt.Parent then
                     prompt.HoldDuration = data.HoldDuration
@@ -1744,12 +1587,11 @@ BotaoTesteX = {
                 end
             end
 
-            -- limpa backup
             _G.PromptBackup = {}
         end
     end
 },
-			    -- Botão teste
+
     AudioLogger = {
         Nome = "Audio Viewer",
         IsToggle = false,
@@ -1793,20 +1635,20 @@ function printTable(tbl)
 
  local function run(val, inPrefix)
   depthCount = depthCount + 15
-  -- if inPrefix then print(string.rep(' ', depthCount) .. '{') end
+
   for i,v in pairs(val) do
    if type(v) == 'table' then
-    -- print(string.rep(' ', depthCount) .. ' [' .. tostring(i) .. '] = {')
+
     GUI.Store.Text = GUI.Store.Text..'\n'..string.rep(' ', depthCount) .. ' [' .. tostring(i) .. '] = {'
     run(v, false)
     wait()
    else
-    -- print(string.rep(' ', depthCount) .. ' [' .. tostring(i) .. '] = ' .. tostring(v))
+
     GUI.Store.Text = GUI.Store.Text..'\n'..string.rep(' ', depthCount) .. ' [' .. tostring(i) .. '] = ' .. tostring(v)
     wait()
    end
   end
-  -- print(string.rep(' ', depthCount) .. '}')
+
   depthCount = depthCount - 15
  end
  run(tbl, true)
@@ -1957,7 +1799,7 @@ function getaudio(place)
    spawn(function()
     if child:IsA("Sound") and not GUI.Logs:FindFirstChild(child.SoundId) and not FindTable(ignore,child.SoundId) then
      local id = string.match(child.SoundId, "rbxasset://sounds.+") or string.match(child.SoundId, "&hash=.+") or string.match(child.SoundId, "%d+")
-     if id ~= nil then  
+     if id ~= nil then
       local newsound = GUI.Audio:Clone()
       if string.sub(id, 1, 6) == "&hash=" or string.sub(id, 1, 7) == "&0hash=" then
        id = string.sub(id, (string.sub(id, 1, 6) == "&hash=" and 7) or (string.sub(id, 1, 7) == "&0hash=" and 8), string.len(id))
@@ -2064,7 +1906,7 @@ game.DescendantAdded:connect(function(added)
  wait()
  if autoscan == true and added:IsA('Sound') and not GUI.Logs:FindFirstChild(added.SoundId) and not FindTable(ignore,added.SoundId) then
   local id = string.match(added.SoundId, "rbxasset://sounds.+") or string.match(added.SoundId, "&hash=.+") or string.match(added.SoundId, "%d+")
-  if id ~= nil then  
+  if id ~= nil then
    local newsound = GUI.Audio:Clone()
     if string.sub(id, 1, 6) == "&hash=" or string.sub(id, 1, 7) == "&0hash=" then
      id = string.sub(id, (string.sub(id, 1, 6) == "&hash=" and 7) or (string.sub(id, 1, 7) == "&0hash=" and 8), string.len(id))
@@ -2088,7 +1930,7 @@ game.DescendantAdded:connect(function(added)
     if success then
         newsound.TextLabel.Text = Asset.Name
      audioname = Asset.Name
-    else 
+    else
      newsound.TextLabel.Text = added.Name
      audioname = added.Name
     end
@@ -2111,7 +1953,7 @@ game.DescendantAdded:connect(function(added)
       GUI.Info.Visible = true
      end
     end)
-    --230'
+
    if scrolldown == true then
     GUI.Logs.CanvasPosition = Vector2.new(0, 9999999999999999999999999999999999999999999, 0, 0)
    end
@@ -2120,7 +1962,7 @@ game.DescendantAdded:connect(function(added)
 end)
 
 GUI.Info.Copy.MouseButton1Click:Connect(function()
- if pcall(function() Synapse:Copy(selectedaudio) end) then 
+ if pcall(function() Synapse:Copy(selectedaudio) end) then
  else
   local clip = setclipboard or Clipboard.set
   clip(selectedaudio)
@@ -2168,7 +2010,7 @@ function drag(gui)
   local startPos
   local function update(input)
    local delta = input.Position - dragStart
-   gui:TweenPosition(UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y), "InOut", "Quart", 0.04, true, nil) 
+   gui:TweenPosition(UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y), "InOut", "Quart", 0.04, true, nil)
   end
   gui.InputBegan:Connect(function(input)
    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -2213,26 +2055,22 @@ ativarreseteetc = {
 
             local playerGui = player:WaitForChild("PlayerGui")
 
-            -- 🔓 ATIVAR TUDO POSSÍVEL DO CORE GUI
             StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true)
             StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, true)
             StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, true)
             StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, true)
             StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.EmotesMenu, true)
 
-            -- 🔓 RESET BUTTON
             pcall(function()
                 StarterGui:SetCore("ResetButtonCallback", true)
             end)
 
-            -- 🔓 FORÇAR GUI VISÍVEL (caso algum script tenha desativado)
             for _, gui in pairs(playerGui:GetChildren()) do
                 if gui:IsA("ScreenGui") then
                     gui.Enabled = true
                 end
             end
 
-            -- 🎨 GUI VISUAL (feedback)
             local screenGui = Instance.new("ScreenGui")
             screenGui.Parent = playerGui
 
@@ -2286,14 +2124,12 @@ BiggerHitBox = {
 
             local playerGui = player:WaitForChild("PlayerGui")
 
-            -- 🔓 FORÇAR GUI VISÍVEL (caso algum script tenha desativado)
             for _, gui in pairs(playerGui:GetChildren()) do
                 if gui:IsA("ScreenGui") then
                     gui.Enabled = true
                 end
             end
 
-            -- 🔓 FORÇAR CHAR (caso algo tenha bugado animação/visibilidade)
             local character = player.Character or player.CharacterAdded:Wait()
             if character then
                 for _, v in pairs(character:GetDescendants()) do
@@ -2306,7 +2142,6 @@ BiggerHitBox = {
                 end
             end
 
-            -- 🎨 GUI VISUAL (feedback)
             local screenGui = Instance.new("ScreenGui")
             screenGui.Parent = playerGui
 
@@ -2348,7 +2183,7 @@ BotaoFlutuar = {
     Nome = "float",
     IsToggle = true,
     Repeat = false,
-    Script = function(state)  -- state = true (on) / false (off)
+    Script = function(state)
         local player = game.Players.LocalPlayer
         local character = player.Character
         if not character then return end
@@ -2356,15 +2191,15 @@ BotaoFlutuar = {
         if not hrp then return end
 
         if state then
-            -- Criar BodyPosition para flutuar
+
             local bp = Instance.new("BodyPosition")
             bp.Name = "FlutuacaoBP"
-            bp.Position = hrp.Position + Vector3.new(0, 5, 0) -- flutua 5 studs acima
+            bp.Position = hrp.Position + Vector3.new(0, 5, 0)
             bp.MaxForce = Vector3.new(400000, 400000, 400000)
             bp.D = 10
             bp.Parent = hrp
         else
-            -- Remover BodyPosition
+
             local bp = hrp:FindFirstChild("FlutuacaoBP")
             if bp then
                 bp:Destroy()
@@ -2386,7 +2221,7 @@ BetaMode = {
         getgenv()._BetaMode = getgenv()._BetaMode or {}
         local beta = getgenv()._BetaMode
 
-        local SPEED_MULT = 0.5  -- metade da velocidade, animações lentas
+        local SPEED_MULT = 0.5
 
         local function setupCharacter(char)
             beta.Character = char
@@ -2401,7 +2236,6 @@ BetaMode = {
 
             beta.OriginalSpeeds = {}
 
-            -- desacelera TODAS as animações atuais
             for _, track in ipairs(beta.Animator:GetPlayingAnimationTracks()) do
                 if not beta.OriginalSpeeds[track] then
                     beta.OriginalSpeeds[track] = track.Speed
@@ -2409,7 +2243,6 @@ BetaMode = {
                 track:AdjustSpeed(SPEED_MULT)
             end
 
-            -- mantém desacelerado + pega animações novas
             beta.Connection = RunService.Heartbeat:Connect(function()
                 if not beta.Animator then return end
 
@@ -2421,16 +2254,13 @@ BetaMode = {
                 end
             end)
 
-            -- reaplica ao respawn
             beta.CharConn = player.CharacterAdded:Connect(function(char)
                 task.wait(0.2)
                 setupCharacter(char)
             end)
 
-            print(">> Beta Mode ATIVADO")
-
         else
-            -- restaurar TODAS as velocidades
+
             if beta.OriginalSpeeds then
                 for track, speed in pairs(beta.OriginalSpeeds) do
                     if track then
@@ -2453,8 +2283,7 @@ BetaMode = {
                 beta.CharConn = nil
             end
 
-            print(">> Beta Mode DESATIVADO")
-        end
+                    end
     end
 },
     InvisibleFling = {
@@ -2462,8 +2291,6 @@ BetaMode = {
         IsToggle = false,
         Repeat = false,
         Script = function()
-           -- // ★ INVISFLING V3 - SOLID COLOR + LIMBS ★
--- // Single color brick, optional arms/legs, clean FE
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -2474,45 +2301,34 @@ local workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- ═══════════════════════════════════════════
--- CONFIGURATION
--- ═══════════════════════════════════════════
 local CONFIG = {
-    -- Flight
+
     FlySpeed = 20,
 
-    -- Spin
     SpinEnabled = true,
     SpinSpeed = 5,
     SpinAxis = "Y",
 
-    -- Color (SINGLE COLOR - pick one, no rainbow)
-    PartColor = Color3.fromRGB(255, 50, 50), -- Default red
+    PartColor = Color3.fromRGB(255, 50, 50),
     RootMaterial = Enum.Material.Neon,
     RootTransparency = 0,
 
-    -- Body Parts
     ArmsEnabled = false,
     LegsEnabled = false,
-    ArmColor = nil,   -- nil = same as body
-    LegColor = nil,   -- nil = same as body
+    ArmColor = nil,
+    LegColor = nil,
 
-    -- Effects
     TrailEnabled = true,
-    TrailColor = nil,  -- nil = same as body
+    TrailColor = nil,
     ParticlesEnabled = true,
     GlowEnabled = true,
     FaceEnabled = true,
     FaceId = "rbxassetid://7668553980",
 
-    -- Fling
     FlingForce = 99999,
     FlingMultiplier = 10,
 }
 
--- ═══════════════════════════════════════════
--- STATE
--- ═══════════════════════════════════════════
 local FLYING = false
 local flyKeyDown, flyKeyUp
 local connections = {}
@@ -2521,7 +2337,6 @@ local rootRef = nil
 local limbParts = {}
 local startTime = tick()
 
--- Preset colors for the picker
 local COLOR_PRESETS = {
     {name = "Red",        color = Color3.fromRGB(255, 50, 50)},
     {name = "Blue",       color = Color3.fromRGB(50, 100, 255)},
@@ -2541,9 +2356,6 @@ local COLOR_PRESETS = {
     {name = "Royal Blue", color = Color3.fromRGB(30, 60, 200)},
 }
 
--- ═══════════════════════════════════════════
--- UTILITIES
--- ═══════════════════════════════════════════
 local function addConn(conn)
     table.insert(connections, conn)
     return conn
@@ -2560,9 +2372,6 @@ local function getColor()
     return CONFIG.PartColor
 end
 
--- ═══════════════════════════════════════════
--- FLY SYSTEM
--- ═══════════════════════════════════════════
 function sFLY()
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -2622,29 +2431,16 @@ function sFLY()
         if gpe then return end
         local spd = CONFIG.FlySpeed
         if input.KeyCode == Enum.KeyCode.W then CONTROL.F = spd
-        elseif input.KeyCode == Enum.KeyCode.S then CONTROL.B = -spd
-        elseif input.KeyCode == Enum.KeyCode.A then CONTROL.L = -spd
-        elseif input.KeyCode == Enum.KeyCode.D then CONTROL.R = spd
-        elseif input.KeyCode == Enum.KeyCode.E then CONTROL.Q = spd * 2
-        elseif input.KeyCode == Enum.KeyCode.Q then CONTROL.E = -spd * 2
         end
     end)
 
     flyKeyUp = UserInputService.InputEnded:Connect(function(input, gpe)
         if gpe then return end
         if input.KeyCode == Enum.KeyCode.W then CONTROL.F = 0
-        elseif input.KeyCode == Enum.KeyCode.S then CONTROL.B = 0
-        elseif input.KeyCode == Enum.KeyCode.A then CONTROL.L = 0
-        elseif input.KeyCode == Enum.KeyCode.D then CONTROL.R = 0
-        elseif input.KeyCode == Enum.KeyCode.E then CONTROL.Q = 0
-        elseif input.KeyCode == Enum.KeyCode.Q then CONTROL.E = 0
         end
     end)
 end
 
--- ═══════════════════════════════════════════
--- LIMBS SYSTEM
--- ═══════════════════════════════════════════
 local function clearLimbs()
     for _, part in ipairs(limbParts) do
         if part and part.Parent then
@@ -2680,27 +2476,24 @@ local function buildLimbs(root)
     clearLimbs()
 
     if CONFIG.ArmsEnabled then
-        -- Right Arm
+
         createLimb(root, "RightArm", Vector3.new(0.5, 1.8, 0.5),
             CFrame.new(1.25, 0, 0))
-        -- Left Arm
+
         createLimb(root, "LeftArm", Vector3.new(0.5, 1.8, 0.5),
             CFrame.new(-1.25, 0, 0))
     end
 
     if CONFIG.LegsEnabled then
-        -- Right Leg
+
         createLimb(root, "RightLeg", Vector3.new(0.5, 1.8, 0.5),
             CFrame.new(0.5, -1.8, 0))
-        -- Left Leg
+
         createLimb(root, "LeftLeg", Vector3.new(0.5, 1.8, 0.5),
             CFrame.new(-0.5, -1.8, 0))
     end
 end
 
--- ═══════════════════════════════════════════
--- EFFECTS (Clean)
--- ═══════════════════════════════════════════
 local function applyFace(root)
     if not CONFIG.FaceEnabled then return end
     local d = Instance.new("Decal")
@@ -2784,42 +2577,34 @@ local function applyGlow(root)
     light.Parent = root
 end
 
--- ═══════════════════════════════════════════
--- UPDATE LOOP
--- ═══════════════════════════════════════════
 local function startUpdateLoop(root, spinForce)
     addConn(RunService.Heartbeat:Connect(function()
         if not root or not root.Parent then return end
 
         local col = getColor()
 
-        -- Root color (SINGLE SOLID COLOR)
         root.Color = col
         root.Material = CONFIG.RootMaterial
         root.CanCollide = false
 
-        -- Glow
         local glow = root:FindFirstChild("InvisGlow")
         if glow then
             glow.Color = col
             glow.Enabled = CONFIG.GlowEnabled
         end
 
-        -- Trail
         local trail = root:FindFirstChild("InvisTrail")
         if trail then
             trail.Color = ColorSequence.new(CONFIG.TrailColor or col)
             trail.Enabled = CONFIG.TrailEnabled
         end
 
-        -- Particles
         local particle = root:FindFirstChild("InvisParticle")
         if particle then
             particle.Color = ColorSequence.new(col)
             particle.Enabled = CONFIG.ParticlesEnabled
         end
 
-        -- Spin
         if spinForce and spinForce.Parent then
             if CONFIG.SpinEnabled then
                 local spd = CONFIG.SpinSpeed * math.pi * 2
@@ -2838,14 +2623,12 @@ local function startUpdateLoop(root, spinForce)
             end
         end
 
-        -- Fling
         local fling = root:FindFirstChildOfClass("BodyThrust")
         if fling then
             fling.Force = Vector3.new(CONFIG.FlingForce, CONFIG.FlingForce * CONFIG.FlingMultiplier, CONFIG.FlingForce)
             fling.Location = root.Position
         end
 
-        -- Limb colors
         for _, limb in ipairs(limbParts) do
             if limb and limb.Parent then
                 limb.Color = CONFIG.ArmColor or CONFIG.LegColor or col
@@ -2857,9 +2640,6 @@ local function startUpdateLoop(root, spinForce)
     end))
 end
 
--- ═══════════════════════════════════════════
--- GUI
--- ═══════════════════════════════════════════
 local function createGUI(root)
     if PlayerGui:FindFirstChild("InvisFlingGUI") then
         PlayerGui:FindFirstChild("InvisFlingGUI"):Destroy()
@@ -2872,7 +2652,6 @@ local function createGUI(root)
     gui.Parent = PlayerGui
     guiRef = gui
 
-    -- Main frame
     local main = Instance.new("Frame")
     main.Name = "Main"
     main.Size = UDim2.new(0, 260, 0, 500)
@@ -2889,7 +2668,6 @@ local function createGUI(root)
     stroke.Color = CONFIG.PartColor
     stroke.Parent = main
 
-    -- Title bar
     local titleBar = Instance.new("Frame")
     titleBar.Size = UDim2.new(1, 0, 0, 34)
     titleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
@@ -2915,7 +2693,6 @@ local function createGUI(root)
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = titleBar
 
-    -- Buttons helper
     local function headerBtn(text, pos, color, parent)
         local b = Instance.new("TextButton")
         b.Size = UDim2.new(0, 24, 0, 24)
@@ -2933,7 +2710,6 @@ local function createGUI(root)
     local closeBtn = headerBtn("X", UDim2.new(1, -30, 0, 5), Color3.fromRGB(170, 40, 40), titleBar)
     local minBtn = headerBtn("—", UDim2.new(1, -58, 0, 5), Color3.fromRGB(170, 140, 30), titleBar)
 
-    -- Scroll
     local scroll = Instance.new("ScrollingFrame")
     scroll.Name = "Content"
     scroll.Size = UDim2.new(1, -12, 1, -40)
@@ -2956,7 +2732,6 @@ local function createGUI(root)
         return ord
     end
 
-    -- Section
     local function section(text)
         local s = Instance.new("TextLabel")
         s.Size = UDim2.new(1, 0, 0, 20)
@@ -2969,7 +2744,6 @@ local function createGUI(root)
         s.Parent = scroll
     end
 
-    -- Toggle
     local function toggle(text, default, callback)
         local f = Instance.new("Frame")
         f.Size = UDim2.new(1, 0, 0, 26)
@@ -3011,7 +2785,6 @@ local function createGUI(root)
         return btn
     end
 
-    -- Slider
     local function slider(text, min, max, default, callback)
         local f = Instance.new("Frame")
         f.Size = UDim2.new(1, 0, 0, 36)
@@ -3091,7 +2864,6 @@ local function createGUI(root)
         end))
     end
 
-    -- Dropdown
     local function dropdown(text, options, default, callback)
         local f = Instance.new("Frame")
         f.Size = UDim2.new(1, 0, 0, 26)
@@ -3157,9 +2929,6 @@ local function createGUI(root)
         end)
     end
 
-    -- ═══ BUILD MENU ═══
-
-    -- Status
     local statusLbl = Instance.new("TextLabel")
     statusLbl.Size = UDim2.new(1, 0, 0, 28)
     statusLbl.BackgroundColor3 = Color3.fromRGB(15, 30, 15)
@@ -3173,7 +2942,6 @@ local function createGUI(root)
     statusLbl.Parent = scroll
     Instance.new("UICorner", statusLbl).CornerRadius = UDim.new(0, 5)
 
-    -- COLOR PICKER (Grid of color buttons)
     section("COLOR")
 
     local colorGrid = Instance.new("Frame")
@@ -3206,7 +2974,6 @@ local function createGUI(root)
         cb.Parent = colorGrid
         Instance.new("UICorner", cb).CornerRadius = UDim.new(0, 4)
 
-        -- Show selected
         if preset.color == CONFIG.PartColor then
             local sel = Instance.new("UIStroke")
             sel.Thickness = 2
@@ -3219,7 +2986,6 @@ local function createGUI(root)
             CONFIG.PartColor = preset.color
             stroke.Color = preset.color
 
-            -- Update selection indicator
             if selectedIndicator then selectedIndicator:Destroy() end
             local sel = Instance.new("UIStroke")
             sel.Thickness = 2
@@ -3229,17 +2995,14 @@ local function createGUI(root)
         end)
     end
 
-    -- FLIGHT
     section("FLIGHT")
     slider("Fly Speed", 1, 200, CONFIG.FlySpeed, function(v) CONFIG.FlySpeed = v end)
 
-    -- SPIN
     section("SPIN")
     toggle("Spin", CONFIG.SpinEnabled, function(v) CONFIG.SpinEnabled = v end)
     slider("Spin Speed", 1, 50, CONFIG.SpinSpeed, function(v) CONFIG.SpinSpeed = v end)
     dropdown("Axis", {"Y", "X", "Z"}, CONFIG.SpinAxis, function(v) CONFIG.SpinAxis = v end)
 
-    -- BODY (Arms & Legs)
     section("BODY")
     toggle("Arms", CONFIG.ArmsEnabled, function(v)
         CONFIG.ArmsEnabled = v
@@ -3250,7 +3013,6 @@ local function createGUI(root)
         buildLimbs(root)
     end)
 
-    -- EFFECTS
     section("EFFECTS")
     toggle("Trail", CONFIG.TrailEnabled, function(v) CONFIG.TrailEnabled = v end)
     toggle("Particles", CONFIG.ParticlesEnabled, function(v) CONFIG.ParticlesEnabled = v end)
@@ -3264,12 +3026,10 @@ local function createGUI(root)
         end
     end)
 
-    -- FLING
     section("FLING")
     slider("Force", 10000, 500000, CONFIG.FlingForce, function(v) CONFIG.FlingForce = v end)
     slider("Multiplier", 1, 30, CONFIG.FlingMultiplier, function(v) CONFIG.FlingMultiplier = v end)
 
-    -- MATERIAL
     section("MATERIAL")
     dropdown("Type", {"Neon", "Glass", "ForceField", "Marble", "Ice", "SmoothPlastic"}, "Neon", function(v)
         local map = {
@@ -3283,13 +3043,11 @@ local function createGUI(root)
         CONFIG.RootMaterial = map[v]
     end)
 
-    -- Transparency slider
     slider("Transparency", 0, 9, 0, function(v)
         CONFIG.RootTransparency = v / 10
         root.Transparency = CONFIG.RootTransparency
     end)
 
-    -- Minimize
     local minimized = false
     minBtn.MouseButton1Click:Connect(function()
         minimized = not minimized
@@ -3302,7 +3060,6 @@ local function createGUI(root)
         gui.Enabled = not gui.Enabled
     end)
 
-    -- Status updater
     task.spawn(function()
         while gui and gui.Parent do
             local up = math.floor(tick() - startTime)
@@ -3311,7 +3068,6 @@ local function createGUI(root)
         end
     end)
 
-    -- RightShift toggle
     addConn(UserInputService.InputBegan:Connect(function(input, gpe)
         if gpe then return end
         if input.KeyCode == Enum.KeyCode.RightShift then
@@ -3320,22 +3076,16 @@ local function createGUI(root)
     end))
 end
 
--- ═══════════════════════════════════════════
--- MAIN EXECUTION
--- ═══════════════════════════════════════════
 local function runInvisfling()
     local speaker = LocalPlayer
     local ch = speaker.Character
-    if not ch then return warn("No character") end
-
-    print("★ Invisfling V3 starting...")
+    if not ch then return end
 
     local humanoid = ch:FindFirstChildWhichIsA("Humanoid")
     if humanoid then
         humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
     end
 
-    -- FE Invisibility trick
     local prt = Instance.new("Model")
     prt.Parent = ch
 
@@ -3354,11 +3104,9 @@ local function runInvisfling()
     z1.Anchored = true
     z1.Position = Vector3.new(0, 9999, 0)
 
-    print("  → Swap 1...")
-    speaker.Character = prt
+        speaker.Character = prt
     task.wait(3)
-    print("  → Swap 2...")
-    speaker.Character = ch
+        speaker.Character = ch
     task.wait(3)
 
     local newHum = Instance.new("Humanoid")
@@ -3366,63 +3114,45 @@ local function runInvisfling()
     newHum.Parent = ch
 
     local root = getRoot(ch)
-    if not root then return warn("No RootPart") end
+    if not root then return end
     rootRef = root
 
-    -- Strip character
     for _, v in pairs(ch:GetChildren()) do
         if v ~= root and v.Name ~= "Humanoid" then
             v:Destroy()
         end
     end
 
-    -- Setup root part (keeps default part shape, NOT a cube)
     root.Transparency = CONFIG.RootTransparency
     root.Color = CONFIG.PartColor
     root.Material = CONFIG.RootMaterial
 
-    -- Apply effects
-    print("  → Effects...")
-    applyFace(root)
+        applyFace(root)
     applyTrail(root)
     applyParticles(root)
     applyGlow(root)
 
-    -- Spin
     local spin = Instance.new("BodyAngularVelocity")
     spin.Name = "SpinForce"
     spin.MaxTorque = Vector3.new(0, math.huge, 0)
     spin.AngularVelocity = Vector3.new(0, CONFIG.SpinSpeed * math.pi * 2, 0)
     spin.Parent = root
 
-    -- Build initial limbs
     buildLimbs(root)
 
-    -- Flight
-    print("  → Flight...")
-    sFLY()
+        sFLY()
     workspace.CurrentCamera.CameraSubject = root
 
-    -- Fling
-    print("  → Fling...")
-    local bambam = Instance.new("BodyThrust")
+        local bambam = Instance.new("BodyThrust")
     bambam.Parent = root
     bambam.Force = Vector3.new(CONFIG.FlingForce, CONFIG.FlingForce * CONFIG.FlingMultiplier, CONFIG.FlingForce)
     bambam.Location = root.Position
 
-    -- Update loop
     startUpdateLoop(root, spin)
 
-    -- GUI
-    print("  → GUI...")
-    createGUI(root)
+        createGUI(root)
 
-    print("═══════════════════════════════════")
-    print("★ INVISFLING V3 ACTIVE ★")
-    print("  RightShift = Toggle Menu")
-    print("  WASD = Fly | QE = Up/Down")
-    print("═══════════════════════════════════")
-end
+                    end
 
 runInvisfling()
         end
@@ -3433,10 +3163,6 @@ QuietServer = {
     Repeat = false,
     Script = function()
 
---==============================================================
--- Serviços
---==============================================================
-
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
@@ -3444,12 +3170,7 @@ local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 
--- 🔥 PLACE ATUAL
 local placeId = game.PlaceId
-
---==============================================================
--- UI Mensagem
---==============================================================
 
 local function showMessage(textMsg, color)
     pcall(function()
@@ -3491,10 +3212,6 @@ local function showMessage(textMsg, color)
     end)
 end
 
---==============================================================
--- Buscar servidores
---==============================================================
-
 local function getServers(cursor)
     local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"
 
@@ -3512,10 +3229,6 @@ local function getServers(cursor)
 
     return nil
 end
-
---==============================================================
--- Achar servidor vazio
---==============================================================
 
 local function findBestServer()
     local cursor = nil
@@ -3548,10 +3261,6 @@ local function findBestServer()
     return bestServer
 end
 
---==============================================================
--- Teleporte inteligente
---==============================================================
-
 local function smartTeleport()
     showMessage("🔎 Looking for an empty server...", Color3.fromRGB(255,255,0))
 
@@ -3565,7 +3274,6 @@ local function smartTeleport()
         end)
 
         if not success then
-            warn("Failed to teleport to the specific server.")
 
             showMessage("⚠️ Going to the normal server...", Color3.fromRGB(255,165,0))
 
@@ -3584,19 +3292,11 @@ local function smartTeleport()
     end
 end
 
---==============================================================
--- Anti-falha (retry automático)
---==============================================================
-
 TeleportService.TeleportInitFailed:Connect(function()
     showMessage("🔁 Failed... trying again...", Color3.fromRGB(255,0,0))
     task.wait(2)
     smartTeleport()
 end)
-
---==============================================================
--- Executar
---==============================================================
 
 smartTeleport()
 
@@ -3608,10 +3308,6 @@ LoudServer = {
     Repeat = false,
     Script = function()
 
---==============================================================
--- Serviços
---==============================================================
-
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
@@ -3619,10 +3315,6 @@ local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local placeId = game.PlaceId
-
---==============================================================
--- UI Mensagem
---==============================================================
 
 local function showMessage(textMsg, color)
     pcall(function()
@@ -3664,10 +3356,6 @@ local function showMessage(textMsg, color)
     end)
 end
 
---==============================================================
--- Buscar servidores
---==============================================================
-
 local function getServers(cursor)
     local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Desc&limit=100"
 
@@ -3686,10 +3374,6 @@ local function getServers(cursor)
     return nil
 end
 
---==============================================================
--- Achar servidor mais cheio (com vaga)
---==============================================================
-
 local function findBestServer()
     local cursor = nil
     local bestServer = nil
@@ -3700,16 +3384,13 @@ local function findBestServer()
 
         if data and data.data then
             for _, server in pairs(data.data) do
-                
-                -- não entrar no mesmo server
+
                 if server.id ~= game.JobId then
-                    
-                    -- garantir vaga
+
                     if server.playing < server.maxPlayers then
-                        
-                        -- evitar server vazio (ajustável)
+
                         if server.playing >= 10 then
-                            
+
                             if server.playing > highestPlayers then
                                 highestPlayers = server.playing
                                 bestServer = server.id
@@ -3731,10 +3412,6 @@ local function findBestServer()
     return bestServer
 end
 
---==============================================================
--- Teleporte inteligente
---==============================================================
-
 local function smartTeleport()
     showMessage("🔎 Procurando servidor cheio...", Color3.fromRGB(255,255,0))
 
@@ -3748,7 +3425,6 @@ local function smartTeleport()
         end)
 
         if not success then
-            warn("Falhou ao teleportar pro server específico")
 
             showMessage("⚠️ Indo pro servidor normal...", Color3.fromRGB(255,165,0))
 
@@ -3767,19 +3443,11 @@ local function smartTeleport()
     end
 end
 
---==============================================================
--- Retry automático
---==============================================================
-
 TeleportService.TeleportInitFailed:Connect(function()
     showMessage("🔁 Falhou... tentando novamente...", Color3.fromRGB(255,0,0))
     task.wait(2)
     smartTeleport()
 end)
-
---==============================================================
--- Executar
---==============================================================
 
 smartTeleport()
 
@@ -3792,37 +3460,361 @@ ClickBlock = {
 
     Script = function(Ativado)
 
-        if Ativado then
+        local Players = game:GetService("Players")
 
-            local player = game.Players.LocalPlayer
-            local mouse = player:GetMouse()
+        local player = Players.LocalPlayer
+        local mouse = player:GetMouse()
 
-            _G.ClickBlockConnection = mouse.Button1Down:Connect(function()
-
-                local pos = mouse.Hit.Position
-
-                local bloco = Instance.new("Part")
-                bloco.Size = Vector3.new(6,6,6)
-                bloco.Anchored = true
-                bloco.Material = Enum.Material.SmoothPlastic
-                bloco.BrickColor = BrickColor.new("Bright blue")
-
-                bloco.Position = Vector3.new(
-                    math.floor(pos.X / 2) * 2,
-                    math.floor(pos.Y / 2) * 2,
-                    math.floor(pos.Z / 2) * 2
-                )
-
-                bloco.Parent = workspace
-            end)
-
-        else
+        local function LimparSistema()
 
             if _G.ClickBlockConnection then
                 _G.ClickBlockConnection:Disconnect()
                 _G.ClickBlockConnection = nil
             end
+
+            if _G.ScaleMouseDownConnection then
+                _G.ScaleMouseDownConnection:Disconnect()
+                _G.ScaleMouseDownConnection = nil
+            end
+
+            if _G.ScaleDragConnection then
+                _G.ScaleDragConnection:Disconnect()
+                _G.ScaleDragConnection = nil
+            end
+
+            if _G.ScaleMouseUpConnection then
+                _G.ScaleMouseUpConnection:Disconnect()
+                _G.ScaleMouseUpConnection = nil
+            end
+
+            if _G.ScaleHandles then
+                _G.ScaleHandles:Destroy()
+                _G.ScaleHandles = nil
+            end
+
+            _G.SelectedBlock = nil
+            _G.ScaleStartSize = nil
+            _G.ScaleStartPosition = nil
+            _G.ScaleStartFace = nil
         end
+
+        if not Ativado then
+            LimparSistema()
+            return
+        end
+
+        LimparSistema()
+
+        _G.SelectedBlock = nil
+        _G.ScaleStartSize = nil
+        _G.ScaleStartPosition = nil
+        _G.ScaleStartFace = nil
+
+        local handles = Instance.new("Handles")
+
+        handles.Name = "ParteSalvaDoJosue_ScaleHandles"
+
+        handles.Style = Enum.HandlesStyle.Resize
+
+        handles.Faces = Faces.new(
+            Enum.NormalId.Left,
+            Enum.NormalId.Right,
+            Enum.NormalId.Top,
+            Enum.NormalId.Bottom,
+            Enum.NormalId.Front,
+            Enum.NormalId.Back
+        )
+
+        handles.Color3 = Color3.fromRGB(0, 170, 255)
+
+        handles.Transparency = 0
+
+        handles.Parent = player:WaitForChild("PlayerGui")
+
+        _G.ScaleHandles = handles
+
+        local function SelecionarBloco(bloco)
+
+            if not bloco then
+
+                _G.SelectedBlock = nil
+                handles.Adornee = nil
+
+                return
+            end
+
+            if not bloco:IsA("BasePart") then
+                return
+            end
+
+            if bloco.Name ~= "ParteSalvaDoJosue" then
+                return
+            end
+
+            _G.SelectedBlock = bloco
+
+            handles.Adornee = bloco
+        end
+
+        _G.ClickBlockConnection = mouse.Button1Down:Connect(function()
+
+            local alvo = mouse.Target
+
+            if alvo
+                and alvo:IsA("BasePart")
+                and alvo.Name == "ParteSalvaDoJosue" then
+
+                SelecionarBloco(alvo)
+
+                return
+            end
+
+            if not mouse.Hit then
+                return
+            end
+
+            local pos = mouse.Hit.Position
+
+            local bloco = Instance.new("Part")
+
+            bloco.Name = "ParteSalvaDoJosue"
+
+            bloco.Size = Vector3.new(
+                6,
+                6,
+                6
+            )
+
+            bloco.Anchored = true
+            bloco.CanCollide = true
+
+            bloco.Material = Enum.Material.SmoothPlastic
+
+            bloco.BrickColor = BrickColor.new("Bright blue")
+
+            bloco.Position = Vector3.new(
+
+                math.floor(pos.X / 2) * 2,
+
+                math.floor(pos.Y / 2) * 2,
+
+                math.floor(pos.Z / 2) * 2
+            )
+
+            bloco.Parent = workspace
+
+            SelecionarBloco(bloco)
+
+        end)
+
+        _G.ScaleMouseDownConnection =
+            handles.MouseButton1Down:Connect(function(face)
+
+                local bloco = _G.SelectedBlock
+
+                if not bloco then
+                    return
+                end
+
+                if not bloco.Parent then
+                    return
+                end
+
+                _G.ScaleStartSize = bloco.Size
+
+                _G.ScaleStartPosition = bloco.Position
+
+                _G.ScaleStartFace = face
+
+            end)
+
+        _G.ScaleDragConnection =
+            handles.MouseDrag:Connect(function(face, distance)
+
+                local bloco = _G.SelectedBlock
+
+                if not bloco then
+                    return
+                end
+
+                if not bloco.Parent then
+                    return
+                end
+
+                if not _G.ScaleStartSize then
+                    return
+                end
+
+                if not _G.ScaleStartPosition then
+                    return
+                end
+
+                local tamanhoInicial =
+                    _G.ScaleStartSize
+
+                local posicaoInicial =
+                    _G.ScaleStartPosition
+
+                local faceInicial =
+                    _G.ScaleStartFace or face
+
+                if faceInicial == Enum.NormalId.Right then
+
+                    local novoX = math.max(
+                        0.2,
+                        tamanhoInicial.X + distance
+                    )
+
+                    local diferenca =
+                        novoX - tamanhoInicial.X
+
+                    bloco.Size = Vector3.new(
+                        novoX,
+                        tamanhoInicial.Y,
+                        tamanhoInicial.Z
+                    )
+
+                    bloco.Position =
+                        posicaoInicial +
+                        Vector3.new(
+                            diferenca / 2,
+                            0,
+                            0
+                        )
+
+                elseif faceInicial == Enum.NormalId.Left then
+
+                    local novoX = math.max(
+                        0.2,
+                        tamanhoInicial.X + distance
+                    )
+
+                    local diferenca =
+                        novoX - tamanhoInicial.X
+
+                    bloco.Size = Vector3.new(
+                        novoX,
+                        tamanhoInicial.Y,
+                        tamanhoInicial.Z
+                    )
+
+                    bloco.Position =
+                        posicaoInicial +
+                        Vector3.new(
+                            -diferenca / 2,
+                            0,
+                            0
+                        )
+
+                elseif faceInicial == Enum.NormalId.Top then
+
+                    local novoY = math.max(
+                        0.2,
+                        tamanhoInicial.Y + distance
+                    )
+
+                    local diferenca =
+                        novoY - tamanhoInicial.Y
+
+                    bloco.Size = Vector3.new(
+                        tamanhoInicial.X,
+                        novoY,
+                        tamanhoInicial.Z
+                    )
+
+                    bloco.Position =
+                        posicaoInicial +
+                        Vector3.new(
+                            0,
+                            diferenca / 2,
+                            0
+                        )
+
+                elseif faceInicial == Enum.NormalId.Bottom then
+
+                    local novoY = math.max(
+                        0.2,
+                        tamanhoInicial.Y + distance
+                    )
+
+                    local diferenca =
+                        novoY - tamanhoInicial.Y
+
+                    bloco.Size = Vector3.new(
+                        tamanhoInicial.X,
+                        novoY,
+                        tamanhoInicial.Z
+                    )
+
+                    bloco.Position =
+                        posicaoInicial +
+                        Vector3.new(
+                            0,
+                            -diferenca / 2,
+                            0
+                        )
+
+                elseif faceInicial == Enum.NormalId.Front then
+
+                    local novoZ = math.max(
+                        0.2,
+                        tamanhoInicial.Z + distance
+                    )
+
+                    local diferenca =
+                        novoZ - tamanhoInicial.Z
+
+                    bloco.Size = Vector3.new(
+                        tamanhoInicial.X,
+                        tamanhoInicial.Y,
+                        novoZ
+                    )
+
+                    bloco.Position =
+                        posicaoInicial +
+                        Vector3.new(
+                            0,
+                            0,
+                            -diferenca / 2
+                        )
+
+                elseif faceInicial == Enum.NormalId.Back then
+
+                    local novoZ = math.max(
+                        0.2,
+                        tamanhoInicial.Z + distance
+                    )
+
+                    local diferenca =
+                        novoZ - tamanhoInicial.Z
+
+                    bloco.Size = Vector3.new(
+                        tamanhoInicial.X,
+                        tamanhoInicial.Y,
+                        novoZ
+                    )
+
+                    bloco.Position =
+                        posicaoInicial +
+                        Vector3.new(
+                            0,
+                            0,
+                            diferenca / 2
+                        )
+
+                end
+
+            end)
+
+        _G.ScaleMouseUpConnection =
+            handles.MouseButton1Up:Connect(function()
+
+                _G.ScaleStartSize = nil
+                _G.ScaleStartPosition = nil
+                _G.ScaleStartFace = nil
+
+            end)
+
     end
 },
 
@@ -3851,17 +3843,12 @@ local Keys = {
         local RootPart = Character:WaitForChild("HumanoidRootPart")
         local Animator = Humanoid:FindFirstChildOfClass("Animator")
 
-        -- velocidade um pouco maior
         local Speed = 44
 
-        ----------------------------------------------------------------
-        -- OFF / FALSE
-        ----------------------------------------------------------------
         if Ativado == false then
 
             Enabled = false
 
-            -- desconecta tudo
             for _, Connection in pairs(Connections) do
                 if Connection then
                     Connection:Disconnect()
@@ -3870,17 +3857,14 @@ local Keys = {
 
             table.clear(Connections)
 
-            -- limpa teclas
             Keys.W = false
             Keys.A = false
             Keys.S = false
             Keys.D = false
 
-            -- volta padrão roblox
             Humanoid.AutoRotate = true
             Humanoid.WalkSpeed = 16
 
-            -- para movimento custom
             RootPart.AssemblyLinearVelocity = Vector3.new(
                 0,
                 RootPart.AssemblyLinearVelocity.Y,
@@ -3889,7 +3873,6 @@ local Keys = {
 
             Humanoid:Move(Vector3.zero, false)
 
-            -- restaura velocidade normal das animações
             if Animator then
                 for _, Track in pairs(Animator:GetPlayingAnimationTracks()) do
                     Track:AdjustSpeed(1)
@@ -3899,9 +3882,6 @@ local Keys = {
             return
         end
 
-        ----------------------------------------------------------------
-        -- ON / TRUE
-        ----------------------------------------------------------------
         Enabled = true
 
         Humanoid.AutoRotate = false
@@ -3987,23 +3967,19 @@ local Keys = {
 
                 MoveDirection = MoveDirection.Unit
 
-                -- movimento
                 RootPart.AssemblyLinearVelocity = Vector3.new(
                     MoveDirection.X * Speed,
                     Y,
                     MoveDirection.Z * Speed
                 )
 
-                -- rotação
                 RootPart.CFrame = CFrame.lookAt(
                     RootPart.Position,
                     RootPart.Position + MoveDirection
                 )
 
-                -- animações
                 Humanoid:Move(Vector3.new(0,0,-0.55), false)
 
-                -- velocidade da animação levemente mais rápida
                 if Animator then
                     for _, Track in pairs(Animator:GetPlayingAnimationTracks()) do
                         if Track.Name:lower():find("walk")
@@ -4038,11 +4014,9 @@ local Keys = {
     Repeat = false,
 
     Script = function(state)
---[[
-    TrollGui Words - Simple and Fast
-]]
-
--- SERVICES ====================================================================
+------------------------------------------------
+-- Troll Words BY: Josue2progamerkawai
+------------------------------------------------
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local UserInputService = game:GetService("UserInputService")
@@ -4051,29 +4025,41 @@ local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- CONFIGURATION ===============================================================
 local CONFIG = {
-    typingSpeed = 0.1,
+    typingSpeed = 0.08,
+    normalTypingSpeed = 0.1,
     minLength = 3,
     maxLength = 20,
 }
 
--- Common words to ignore
 local commonWords = {
     ["the"] = true, ["and"] = true, ["a"] = true, ["an"] = true,
     ["is"] = true, ["it"] = true, ["to"] = true, ["of"] = true,
     ["in"] = true, ["for"] = true, ["on"] = true, ["with"] = true,
     ["as"] = true, ["at"] = true, ["by"] = true, ["or"] = true,
+    ["be"] = true, ["this"] = true, ["that"] = true, ["from"] = true,
+    ["but"] = true, ["not"] = true, ["are"] = true, ["was"] = true,
+    ["were"] = true, ["they"] = true, ["them"] = true, ["their"] = true,
 }
 
--- GLOBAL VARIABLES ===========================================================
+local commonWordsPT = {
+    ["o"] = true, ["a"] = true, ["os"] = true, ["as"] = true,
+    ["um"] = true, ["uma"] = true, ["uns"] = true, ["umas"] = true,
+    ["de"] = true, ["do"] = true, ["da"] = true, ["dos"] = true, ["das"] = true,
+    ["em"] = true, ["no"] = true, ["na"] = true, ["nos"] = true, ["nas"] = true,
+    ["por"] = true, ["para"] = true, ["com"] = true, ["sem"] = true,
+    ["que"] = true, ["se"] = true, ["não"] = true, ["mais"] = true,
+    ["como"] = true, ["mas"] = true, ["ou"] = true, ["seu"] = true,
+    ["sua"] = true, ["ele"] = true, ["ela"] = true, ["eles"] = true, ["elas"] = true,
+    ["é"] = true, ["foi"] = true, ["ser"] = true, ["está"] = true, ["estão"] = true,
+    ["eu"] = true, ["você"] = true, ["nós"] = true, ["meu"] = true, ["minha"] = true,
+}
+
 local allWords = {}
 local usedWords = {}
 local isTyping = false
-
--- GUI SETUP ===================================================================
-local Players = game:GetService("Players")
-local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+local insanoMode = true
+local isPortuguese = false
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "TrollGuiWords"
@@ -4094,145 +4080,290 @@ pcall(function()
     end
 end)
 
--- Main Frame
+local containerFrame = Instance.new("Frame")
+containerFrame.Size = UDim2.new(0, 645, 0, 65)
+containerFrame.Position = UDim2.new(0.5, -322, 0.5, -32)
+containerFrame.BackgroundTransparency = 1
+containerFrame.BorderSizePixel = 0
+containerFrame.Active = true
+containerFrame.Selectable = true
+containerFrame.Parent = screenGui
+
+local insanoFrame = Instance.new("Frame")
+insanoFrame.Size = UDim2.new(0, 130, 0, 65)
+insanoFrame.Position = UDim2.new(0, 0, 0, 0)
+insanoFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+insanoFrame.BorderSizePixel = 0
+insanoFrame.BackgroundTransparency = 0.05
+insanoFrame.Parent = containerFrame
+
+local insanoCorner = Instance.new("UICorner")
+insanoCorner.CornerRadius = UDim.new(0, 14)
+insanoCorner.Parent = insanoFrame
+
+local insanoStroke = Instance.new("UIStroke")
+insanoStroke.Color = Color3.fromRGB(140, 20, 255)
+insanoStroke.Thickness = 2
+insanoStroke.Transparency = 0.3
+insanoStroke.Parent = insanoFrame
+
+local insanoGradient = Instance.new("UIGradient")
+insanoGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(130, 20, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 60, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(130, 20, 255))
+})
+insanoGradient.Rotation = 45
+insanoGradient.Parent = insanoStroke
+
+local insanoButton = Instance.new("TextButton")
+insanoButton.Size = UDim2.new(1, -6, 1, -6)
+insanoButton.Position = UDim2.new(0, 3, 0, 3)
+insanoButton.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
+insanoButton.BorderSizePixel = 0
+insanoButton.TextColor3 = Color3.fromRGB(210, 170, 255)
+insanoButton.Font = Enum.Font.GothamBold
+insanoButton.TextSize = 12
+insanoButton.Text = "INSANO ON"
+insanoButton.ZIndex = 1
+insanoButton.Parent = insanoFrame
+
+local insanoButtonCorner = Instance.new("UICorner")
+insanoButtonCorner.CornerRadius = UDim.new(0, 10)
+insanoButtonCorner.Parent = insanoButton
+
+local insanoButtonStroke = Instance.new("UIStroke")
+insanoButtonStroke.Color = Color3.fromRGB(90, 50, 170)
+insanoButtonStroke.Thickness = 1
+insanoButtonStroke.Transparency = 0.5
+insanoButtonStroke.Parent = insanoButton
+
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 300, 0, 60)
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -30)
-mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+mainFrame.Size = UDim2.new(0, 380, 0, 65)
+mainFrame.Position = UDim2.new(0, 132, 0, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
 mainFrame.BorderSizePixel = 0
-mainFrame.BackgroundTransparency = 0.15
+mainFrame.BackgroundTransparency = 0.05
 mainFrame.Active = true
 mainFrame.Selectable = true
-mainFrame.Parent = screenGui
+mainFrame.Parent = containerFrame
 
--- UICorner
 local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 10)
+mainCorner.CornerRadius = UDim.new(0, 14)
 mainCorner.Parent = mainFrame
 
--- UIStroke
 local mainStroke = Instance.new("UIStroke")
-mainStroke.Color = Color3.fromRGB(100, 0, 255)
+mainStroke.Color = Color3.fromRGB(140, 20, 255)
 mainStroke.Thickness = 2
-mainStroke.Transparency = 0.5
+mainStroke.Transparency = 0.3
 mainStroke.Parent = mainFrame
 
--- Barra de arrasto (apenas uma fina faixa no topo)
+local mainGradient = Instance.new("UIGradient")
+mainGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(130, 20, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 60, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(130, 20, 255))
+})
+mainGradient.Rotation = 45
+mainGradient.Parent = mainStroke
+
 local dragBar = Instance.new("TextButton")
-dragBar.Size = UDim2.new(1, -40, 0, 20)
-dragBar.Position = UDim2.new(0, 0, 0, 0)
+dragBar.Size = UDim2.new(1, -50, 0, 20)
+dragBar.Position = UDim2.new(0, 25, 0, 0)
 dragBar.BackgroundTransparency = 1
 dragBar.Text = ""
 dragBar.BorderSizePixel = 0
 dragBar.ZIndex = 3
 dragBar.Parent = mainFrame
 
--- Close Button (X)
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -50, 0, 18)
+titleLabel.Position = UDim2.new(0, 25, 0, 1)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Troll Words"
+titleLabel.TextColor3 = Color3.fromRGB(180, 150, 230)
+titleLabel.Font = Enum.Font.GothamSemibold
+titleLabel.TextSize = 11
+titleLabel.TextTransparency = 0.4
+titleLabel.ZIndex = 3
+titleLabel.Parent = mainFrame
+
 local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 30, 0, 30)
-closeButton.Position = UDim2.new(1, -30, 0, 0)
-closeButton.BackgroundColor3 = Color3.fromRGB(255, 30, 30)
+closeButton.Size = UDim2.new(0, 26, 0, 26)
+closeButton.Position = UDim2.new(1, -28, 0, 2)
+closeButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
 closeButton.BorderSizePixel = 0
 closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeButton.Font = Enum.Font.GothamBold
-closeButton.TextSize = 16
-closeButton.Text = "✕"
+closeButton.TextSize = 13
+closeButton.Text = "X"
 closeButton.ZIndex = 2
 closeButton.Parent = mainFrame
 
 local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 10)
+closeCorner.CornerRadius = UDim.new(0, 13)
 closeCorner.Parent = closeButton
 
--- TextBox (MAIOR e mais fácil de clicar)
 local searchBox = Instance.new("TextBox")
-searchBox.Size = UDim2.new(1, -10, 1, -10)
-searchBox.Position = UDim2.new(0, 5, 0, 5)
-searchBox.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+searchBox.Size = UDim2.new(1, -50, 0, 36)
+searchBox.Position = UDim2.new(0, 25, 0, 24)
+searchBox.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
 searchBox.BorderSizePixel = 0
-searchBox.TextColor3 = Color3.fromRGB(200, 150, 255)
+searchBox.TextColor3 = Color3.fromRGB(210, 170, 255)
 searchBox.PlaceholderText = "Digite e pressione Enter..."
-searchBox.Font = Enum.Font.GothamBold
-searchBox.TextSize = 20
+searchBox.PlaceholderColor3 = Color3.fromRGB(100, 80, 140)
+searchBox.Font = Enum.Font.GothamSemibold
+searchBox.TextSize = 16
 searchBox.ClearTextOnFocus = false
 searchBox.Text = ""
 searchBox.ZIndex = 1
 searchBox.Parent = mainFrame
 
 local searchCorner = Instance.new("UICorner")
-searchCorner.CornerRadius = UDim.new(0, 8)
+searchCorner.CornerRadius = UDim.new(0, 10)
 searchCorner.Parent = searchBox
 
--- DICTIONARY LOADING ==========================================================
+local searchStroke = Instance.new("UIStroke")
+searchStroke.Color = Color3.fromRGB(90, 50, 170)
+searchStroke.Thickness = 1
+searchStroke.Transparency = 0.5
+searchStroke.Parent = searchBox
+
+local languageFrame = Instance.new("Frame")
+languageFrame.Size = UDim2.new(0, 130, 0, 65)
+languageFrame.Position = UDim2.new(0, 514, 0, 0)
+languageFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+languageFrame.BorderSizePixel = 0
+languageFrame.BackgroundTransparency = 0.05
+languageFrame.Parent = containerFrame
+
+local languageCorner = Instance.new("UICorner")
+languageCorner.CornerRadius = UDim.new(0, 14)
+languageCorner.Parent = languageFrame
+
+local languageStroke = Instance.new("UIStroke")
+languageStroke.Color = Color3.fromRGB(100, 140, 255)
+languageStroke.Thickness = 2
+languageStroke.Transparency = 0.3
+languageStroke.Parent = languageFrame
+
+local languageGradient = Instance.new("UIGradient")
+languageGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 130, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(140, 170, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 130, 255))
+})
+languageGradient.Rotation = 45
+languageGradient.Parent = languageStroke
+
+local languageButton = Instance.new("TextButton")
+languageButton.Size = UDim2.new(1, -6, 1, -6)
+languageButton.Position = UDim2.new(0, 3, 0, 3)
+languageButton.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
+languageButton.BorderSizePixel = 0
+languageButton.TextColor3 = Color3.fromRGB(170, 200, 255)
+languageButton.Font = Enum.Font.GothamBold
+languageButton.TextSize = 12
+languageButton.Text = "🌐 NORMAL"
+languageButton.ZIndex = 1
+languageButton.Parent = languageFrame
+
+local languageButtonCorner = Instance.new("UICorner")
+languageButtonCorner.CornerRadius = UDim.new(0, 10)
+languageButtonCorner.Parent = languageButton
+
+local languageButtonStroke = Instance.new("UIStroke")
+languageButtonStroke.Color = Color3.fromRGB(70, 100, 170)
+languageButtonStroke.Thickness = 1
+languageButtonStroke.Transparency = 0.5
+languageButtonStroke.Parent = languageButton
+
 local function loadDictionary()
-    local urls = {
-        "https://raw.githubusercontent.com/dwyl/english-words/refs/heads/master/words_dictionary.json",
-        "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-usa-no-swears.txt"
-    }
+    allWords = {}
+    usedWords = {}
+    
+    local urls = {}
+    local currentCommonWords = commonWords
+    
+    if isPortuguese then
+        urls = {
+            "https://raw.githubusercontent.com/pythonprobr/palavras/master/palavras.txt"
+        }
+        currentCommonWords = commonWordsPT
+    else
+        urls = {
+            "https://raw.githubusercontent.com/dwyl/english-words/refs/heads/master/words_dictionary.json",
+            "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-usa-no-swears.txt"
+        }
+        currentCommonWords = commonWords
+    end
 
     for _, url in ipairs(urls) do
         local ok, content = pcall(function()
             return game:HttpGet(url)
         end)
 
-        if ok then
+        if ok and content then
             if content:match("^%s*{") then
                 local success, wordsJson = pcall(function()
                     return HttpService:JSONDecode(content)
                 end)
                 
-                if success then
+                if success and wordsJson then
                     for word, _ in pairs(wordsJson) do
-                        local len = #word
-                        if len >= CONFIG.minLength and len <= CONFIG.maxLength and not commonWords[word:lower()] then
-                            table.insert(allWords, word:lower())
+                        if word and type(word) == "string" then
+                            local cleanWord = word:lower():gsub("[^a-záàâãéèêíïóôõöúçñ]", "")
+                            local len = #cleanWord
+                            if len >= CONFIG.minLength and len <= CONFIG.maxLength and not currentCommonWords[cleanWord] then
+                                table.insert(allWords, cleanWord)
+                            end
                         end
                     end
                 end
             else
                 for word in content:gmatch("[^\r\n]+") do
-                    local len = #word
-                    if len >= CONFIG.minLength and len <= CONFIG.maxLength and not commonWords[word:lower()] then
-                        table.insert(allWords, word:lower())
+                    if word and type(word) == "string" then
+                        local cleanWord = word:lower():gsub("%s+", ""):gsub("[^a-záàâãéèêíïóôõöúçñ]", "")
+                        local len = #cleanWord
+                        if len >= CONFIG.minLength and len <= CONFIG.maxLength and not currentCommonWords[cleanWord] then
+                            table.insert(allWords, cleanWord)
+                        end
                     end
                 end
-            end
-            
-            if #allWords > 0 then
-                return true
             end
         end
         task.wait(0.1)
     end
-    return false
+    
+    return #allWords > 0
 end
 
--- AUTO-TYPE FUNCTION ==========================================================
 local function autoTypeWord(word, currentInput)
     if isTyping then return end
     isTyping = true
     
     local remaining = word:sub(#currentInput + 1)
+    local speed = insanoMode and CONFIG.typingSpeed or CONFIG.normalTypingSpeed
     
     task.spawn(function()
         local cam = workspace.CurrentCamera
         local size = cam.ViewportSize
         local x, y = size.X/2, size.Y/2
         
-        for _ = 1, 3 do
+        for _ = 1, 2 do
             VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
-            task.wait(0.03)
+            task.wait(0.02)
             VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
-            task.wait(0.03)
+            task.wait(0.02)
         end
 
         for c in remaining:upper():gmatch(".") do
             VirtualInputManager:SendKeyEvent(true, Enum.KeyCode[c], false, game)
-            task.wait(CONFIG.typingSpeed)
+            task.wait(speed)
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode[c], false, game)
         end
 
-        task.wait(0.1)
+        task.wait(0.08)
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
         
@@ -4240,7 +4371,6 @@ local function autoTypeWord(word, currentInput)
     end)
 end
 
--- FIND LONGEST UNUSED WORD ===================================================
 local function findLongestWord(input)
     local bestWord = nil
     local bestLength = 0
@@ -4257,7 +4387,35 @@ local function findLongestWord(input)
     return bestWord
 end
 
--- DRAG FUNCTIONALITY =========================================================
+local function findCommonWord(input)
+    local matchingWords = {}
+    
+    for _, w in ipairs(allWords) do
+        if w:sub(1, #input) == input and w ~= input and not usedWords[w] then
+            table.insert(matchingWords, w)
+        end
+    end
+    
+    if #matchingWords == 0 then
+        return nil
+    end
+    
+    table.sort(matchingWords, function(a, b)
+        return #a < #b
+    end)
+    
+    local shortWords = {}
+    local minLength = #matchingWords[1]
+    
+    for _, w in ipairs(matchingWords) do
+        if #w <= minLength + 2 then
+            table.insert(shortWords, w)
+        end
+    end
+    
+    return shortWords[math.random(1, #shortWords)]
+end
+
 local dragging = false
 local dragStart = nil
 local startPos = nil
@@ -4266,7 +4424,7 @@ dragBar.MouseButton1Down:Connect(function()
     dragging = true
     local mousePos = UserInputService:GetMouseLocation()
     dragStart = Vector2.new(mousePos.X, mousePos.Y)
-    startPos = mainFrame.Position
+    startPos = containerFrame.Position
     
     local moveConnection
     local releaseConnection
@@ -4277,7 +4435,7 @@ dragBar.MouseButton1Down:Connect(function()
             local deltaX = currentMouse.X - dragStart.X
             local deltaY = currentMouse.Y - dragStart.Y
             
-            mainFrame.Position = UDim2.new(
+            containerFrame.Position = UDim2.new(
                 startPos.X.Scale,
                 startPos.X.Offset + deltaX,
                 startPos.Y.Scale,
@@ -4295,22 +4453,80 @@ dragBar.MouseButton1Down:Connect(function()
     end)
 end)
 
--- EVENTS =====================================================================
 closeButton.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Clica em qualquer lugar do mainFrame para focar na TextBox
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         searchBox:CaptureFocus()
     end
 end)
 
+insanoButton.MouseButton1Click:Connect(function()
+    insanoMode = not insanoMode
+    
+    if insanoMode then
+        insanoButton.Text = "INSANO ON"
+        insanoButton.TextColor3 = Color3.fromRGB(210, 170, 255)
+        insanoStroke.Color = Color3.fromRGB(140, 20, 255)
+        insanoGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(130, 20, 255)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 60, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(130, 20, 255))
+        })
+        insanoButtonStroke.Color = Color3.fromRGB(90, 50, 170)
+    else
+        insanoButton.Text = "INSANO OFF"
+        insanoButton.TextColor3 = Color3.fromRGB(255, 110, 110)
+        insanoStroke.Color = Color3.fromRGB(255, 40, 40)
+        insanoGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 40, 40)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 80, 80)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 40, 40))
+        })
+        insanoButtonStroke.Color = Color3.fromRGB(170, 50, 50)
+    end
+end)
+
+languageButton.MouseButton1Click:Connect(function()
+    isPortuguese = not isPortuguese
+    
+    if isPortuguese then
+        languageButton.Text = "🇧🇷 PT-BR"
+        languageButton.TextColor3 = Color3.fromRGB(150, 255, 150)
+        languageStroke.Color = Color3.fromRGB(30, 255, 30)
+        languageGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 255, 50)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80, 255, 80)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 255, 50))
+        })
+        languageButtonStroke.Color = Color3.fromRGB(60, 180, 60)
+    else
+        languageButton.Text = "🌐 NORMAL"
+        languageButton.TextColor3 = Color3.fromRGB(170, 200, 255)
+        languageStroke.Color = Color3.fromRGB(100, 140, 255)
+        languageGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 130, 255)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(140, 170, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 130, 255))
+        })
+        languageButtonStroke.Color = Color3.fromRGB(70, 100, 170)
+    end
+    
+    loadDictionary()
+end)
+
 searchBox.FocusLost:Connect(function(enterPressed)
     if enterPressed and searchBox.Text ~= "" and not isTyping then
         local input = searchBox.Text:lower()
-        local word = findLongestWord(input)
+        local word
+        
+        if insanoMode then
+            word = findLongestWord(input)
+        else
+            word = findCommonWord(input)
+        end
         
         if word then
             usedWords[word] = true
@@ -4322,7 +4538,42 @@ searchBox.FocusLost:Connect(function(enterPressed)
     end
 end)
 
--- START =======================================================================
+closeButton.MouseEnter:Connect(function()
+    closeButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+end)
+
+closeButton.MouseLeave:Connect(function()
+    closeButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+end)
+
+searchBox.Focused:Connect(function()
+    searchBox.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
+    searchStroke.Color = Color3.fromRGB(140, 90, 255)
+    searchStroke.Transparency = 0.2
+end)
+
+searchBox.FocusLost:Connect(function()
+    searchBox.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
+    searchStroke.Color = Color3.fromRGB(90, 50, 170)
+    searchStroke.Transparency = 0.5
+end)
+
+insanoButton.MouseEnter:Connect(function()
+    insanoButton.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+end)
+
+insanoButton.MouseLeave:Connect(function()
+    insanoButton.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
+end)
+
+languageButton.MouseEnter:Connect(function()
+    languageButton.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+end)
+
+languageButton.MouseLeave:Connect(function()
+    languageButton.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
+end)
+
 task.spawn(function()
     loadDictionary()
     searchBox:CaptureFocus()
@@ -4337,7 +4588,6 @@ GodMode = {
     Script = function(state)
         local player = game:GetService("Players").LocalPlayer
 
-        -- Loop único
         task.spawn(function()
             while task.wait() do
                 local character = player.Character
@@ -4356,7 +4606,6 @@ GodMode = {
                     part.CanTouch = not state
                 end
 
-                -- Se o toggle foi desligado, restaura e encerra
                 if not state then
                     for _, part in ipairs(parts) do
                         part.CanTouch = true
@@ -4378,7 +4627,7 @@ Underground = {
 
         return function(state)
 
-            local animationTime = 2
+            local animationTime = 1.5
 
             local Players = game:GetService("Players")
             local TweenService = game:GetService("TweenService")
@@ -4442,7 +4691,7 @@ Underground = {
                     root,
                     TweenInfo.new(animationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
                     {
-                        CFrame = root.CFrame * CFrame.new(0,-10,0)
+                        CFrame = root.CFrame * CFrame.new(0,-15,0)
                     }
                 )
 
@@ -4516,24 +4765,134 @@ Underground = {
 
     end)()
 },
+ReviveFree = {
+    Nome = "ReviveFree",
+    IsToggle = false,
+    Repeat = false,
+
+    Script = (function()
+        local Players = game:GetService("Players")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local LocalPlayer = Players.LocalPlayer
+
+        local function FindReviveRemotes()
+            local foundRemotes = {}
+            local searchPattern = "revive"
+
+            local function SearchInContainer(container, path)
+                path = path or ""
+
+                for _, child in ipairs(container:GetChildren()) do
+                    local currentPath = path .. "/" .. child.Name
+
+                    if child:IsA("RemoteEvent") then
+                        local nameLower = string.lower(child.Name)
+                        if string.find(nameLower, searchPattern) then
+                            table.insert(foundRemotes, {
+                                Remote = child,
+                                Name = child.Name,
+                                Path = currentPath,
+                                Parent = child.Parent
+                            })
+                        end
+                    end
+
+                    if child:IsA("Folder") or child:IsA("Model") or child:IsA("Tool") then
+                        SearchInContainer(child, currentPath)
+                    end
+                end
+            end
+
+            SearchInContainer(ReplicatedStorage, "ReplicatedStorage")
+
+            SearchInContainer(workspace, "Workspace")
+
+            for _, player in ipairs(Players:GetPlayers()) do
+            task.wait(0.1)
+                SearchInContainer(player, "Players/" .. player.Name)
+            end
+
+            if LocalPlayer then
+            task.wait(0.1)
+                SearchInContainer(LocalPlayer, "LocalPlayer")
+            end
+
+            return foundRemotes
+        end
+
+        local function AttemptRevive()
+            local remotes = FindReviveRemotes()
+
+            if #remotes == 0 then
+            task.wait(0.1)
+                                return false
+            end
+
+                        for i, remoteInfo in ipairs(remotes) do
+            task.wait(0.1)
+                            end
+
+            local successCount = 0
+
+            for _, remoteInfo in ipairs(remotes) do
+            task.wait(0.1)
+                local remote = remoteInfo.Remote
+
+                local methods = {
+                    { method = "FireServer", args = {true} },
+                }
+
+                for _, try in ipairs(methods) do
+                task.wait(0.1)
+                    local success, err = pcall(function()
+                        if try.method == "FireServer" then
+                            remote:FireServer(unpack(try.args))
+                        elseif try.method == "FireClient" then
+                            remote:FireClient(unpack(try.args))
+                        end
+                    end)
+
+                    if success then
+                    task.wait(0.1)
+                        successCount = successCount + 1
+                                                break
+                    end
+                end
+            end
+
+            return successCount > 0
+        end
+
+        local function MainRevive()
+        task.wait(0.1)
+                        local result = AttemptRevive()
+
+            if result then
+                            end
+
+            return result
+        end
+
+        _G.Revive = MainRevive
+
+        task.spawn(MainRevive)
+    end)
+},
 }
 -- FIM DA SEÇÃO DE BOTÕES ↑↑↑
 
--- Variáveis do sistema de botões
 local buttonStates = {}
 local buttonConnections = {}
 local buttonCooldowns = {}
 local customButtonFrames = {}
 local searchBoxCustom = nil
 
--- Garantir RemoteEvent
 if not ReplicatedStorage:FindFirstChild("TrollGuiRemote") then
     local re = Instance.new("RemoteEvent")
     re.Name = "TrollGuiRemote"
     re.Parent = ReplicatedStorage
 end
 
--- Estados runtime
 local speedValue = nil
 local allEspEnabled = false
 local minimizeKey = "R"
@@ -4567,7 +4926,6 @@ local tpDistanceStuds = 2
 local highlights = {}
 local connections = {}
 
--- Setup humanoid & animations
 local humanoid = nil
 
 local function setupHumanoid()
@@ -4582,16 +4940,15 @@ player.CharacterAdded:Connect(function()
     setupHumanoid()
 end)
 
-if player.Character then 
+if player.Character then
     task.wait(0.5)
-    setupHumanoid() 
+    setupHumanoid()
 end
 
--- Funções do sistema de botões
 local function createCustomButton(buttonName, buttonData, Content, layoutOrder)
     buttonStates[buttonName] = false
     buttonCooldowns[buttonName] = false
-    
+
     local buttonFrame = Instance.new("TextButton")
     buttonFrame.Name = buttonName
     buttonFrame.Size = UDim2.new(0.95, 0, 0, 36)
@@ -4605,83 +4962,81 @@ local function createCustomButton(buttonName, buttonData, Content, layoutOrder)
         buttonFrame.LayoutOrder = layoutOrder
     end
     buttonFrame.Parent = Content
-    
+
     customButtonFrames[buttonName] = buttonFrame
-    
+
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = buttonFrame
-    
+
     if buttonData.IsToggle then
         buttonFrame.Text = buttonData.Nome .. " : OFF"
     else
         buttonFrame.Text = buttonData.Nome
     end
-    
+
     local normalSize = buttonFrame.Size
-    local bigSize = UDim2.new(normalSize.X.Scale, normalSize.X.Offset + 10, 
+    local bigSize = UDim2.new(normalSize.X.Scale, normalSize.X.Offset + 10,
         normalSize.Y.Scale, normalSize.Y.Offset + 4)
-    
+
     buttonFrame.MouseEnter:Connect(function()
         pcall(function()
             buttonFrame:TweenSize(bigSize, "Out", "Quad", 0.1, true)
         end)
     end)
-    
+
     buttonFrame.MouseLeave:Connect(function()
         pcall(function()
             buttonFrame:TweenSize(normalSize, "Out", "Quad", 0.1, true)
         end)
     end)
-    
+
     local function executeButtonScript()
         if buttonCooldowns[buttonName] then
             return
         end
-        
+
         if not buttonData.IsToggle then
             buttonCooldowns[buttonName] = true
             task.delay(0.3, function()
                 buttonCooldowns[buttonName] = false
             end)
         end
-        
+
         if buttonData.IsToggle then
             local newState = not buttonStates[buttonName]
             buttonStates[buttonName] = newState
-            
+
             buttonFrame.Text = buttonData.Nome .. " : " .. (newState and "ON" or "OFF")
-            
-            buttonFrame.BackgroundColor3 = newState and Color3.fromRGB(60, 200, 80) 
+
+            buttonFrame.BackgroundColor3 = newState and Color3.fromRGB(60, 200, 80)
                 or Color3.fromRGB(48, 48, 48)
-            
+
             local success, errorMsg = pcall(function()
                 if buttonData.Script then
                     buttonData.Script(newState)
                 end
             end)
-            
+
             if not success then
-                warn("Erro no script do botão " .. buttonName .. ": " .. tostring(errorMsg))
-                buttonStates[buttonName] = not newState
+                                buttonStates[buttonName] = not newState
                 buttonFrame.Text = buttonData.Nome .. " : " .. (not newState and "ON" or "OFF")
-                buttonFrame.BackgroundColor3 = not newState and Color3.fromRGB(60, 200, 80) 
+                buttonFrame.BackgroundColor3 = not newState and Color3.fromRGB(60, 200, 80)
                     or Color3.fromRGB(48, 48, 48)
             end
-            
+
             if newState and buttonData.Repeat then
                 if buttonConnections[buttonName] then
                     buttonConnections[buttonName]:Disconnect()
                 end
-                
+
                 buttonConnections[buttonName] = RunService.Heartbeat:Connect(function()
                     if buttonStates[buttonName] and buttonData.Script then
                         local successLoop, errorLoop = pcall(function()
                             buttonData.Script(true)
                         end)
                         if not successLoop then
-                            warn("Erro no loop do botão " .. buttonName .. ": " .. tostring(errorLoop))
-                            buttonConnections[buttonName]:Disconnect()
+                                                        buttonConnections[buttonName]:Disconnect()
                             buttonConnections[buttonName] = nil
                         end
                     else
@@ -4700,42 +5055,39 @@ local function createCustomButton(buttonName, buttonData, Content, layoutOrder)
         else
             local originalColor = buttonFrame.BackgroundColor3
             buttonFrame.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-            
+
             local success, errorMsg = pcall(function()
                 if buttonData.Script then
                     buttonData.Script()
                 end
             end)
-            
+
             if not success then
-                warn("Erro no script do botão " .. buttonName .. ": " .. tostring(errorMsg))
-            end
-            
+                            end
+
             local restoreColor = function()
                 if buttonFrame and buttonFrame.Parent then
                     buttonFrame.BackgroundColor3 = originalColor
                 end
             end
-            
+
             task.spawn(function()
                 task.wait(0.2)
                 restoreColor()
             end)
         end
     end
-    
+
     buttonFrame.MouseButton1Click:Connect(executeButtonScript)
-    
+
     return buttonFrame
 end
 
--- Utility safe pcall
 local function safeCall(fn, ...)
     local ok, res = pcall(fn, ...)
     return ok, res
 end
 
--- ESP helpers
 local function createESPFor(p)
     if not p or not p.Character or highlights[p] then return end
     local h = Instance.new("Highlight")
@@ -4801,9 +5153,9 @@ local function teleportToPosition(txt)
     local x,y,z = text:match("^([%-%d%.]+),([%-%d%.]+),([%-%d%.]+)$")
     if x and y and z and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = player.Character.HumanoidRootPart
-        -- Pega a rotação atual
+
         local currentRotation = hrp.CFrame.Rotation
-        -- Aplica nova posição mantendo a rotação
+
         hrp.CFrame = CFrame.new(tonumber(x), tonumber(y), tonumber(z)) * currentRotation
         return true
     end
@@ -4812,33 +5164,33 @@ end
 
 local function findPlayerByNameOrDisplayName(searchText)
     if searchText == "" then return nil end
-    
+
     local searchLower = string.lower(searchText)
-    
+
     for _, p in pairs(Players:GetPlayers()) do
         if string.lower(p.Name) == searchLower then
             return p
         end
     end
-    
+
     for _, p in pairs(Players:GetPlayers()) do
         if p.DisplayName and string.lower(p.DisplayName) == searchLower then
             return p
         end
     end
-    
+
     for _, p in pairs(Players:GetPlayers()) do
         if string.find(string.lower(p.Name), searchLower, 1, true) then
             return p
         end
     end
-    
+
     for _, p in pairs(Players:GetPlayers()) do
         if p.DisplayName and string.find(string.lower(p.DisplayName), searchLower, 1, true) then
             return p
         end
     end
-    
+
     local id = tonumber(searchText)
     if id then
         for _, p in pairs(Players:GetPlayers()) do
@@ -4847,11 +5199,10 @@ local function findPlayerByNameOrDisplayName(searchText)
             end
         end
     end
-    
+
     return nil
 end
 
--- ========== SISTEMA DE NOTIFICAÇÃO DE SAÍDA ==========
 local function setupPlayerLeaveNotification()
     local function onPlayerRemoving(leavingPlayer)
         if trackedPlayer and leavingPlayer == trackedPlayer then
@@ -4861,50 +5212,50 @@ local function setupPlayerLeaveNotification()
                 Icon = "rbxassetid://",
                 Duration = 3
             })
-            
+
             trackedPlayer = nil
             currentTarget = nil
-            
+
             if PlayerName then
                 PlayerName.Text = "Nenhum jogador citado"
             end
             if PlayerImg then
                 PlayerImg.Image = "rbxassetid://0"
             end
-            
+
             if TeleToPlayer then TeleToPlayer.Visible = false end
             if SpectateBtn then SpectateBtn.Visible = false end
             if ESPBtn then ESPBtn.Visible = false end
             if LoopTPBtn then LoopTPBtn.Visible = false end
-            
+
             if espEnabledSingle then
                 removeESPFor(leavingPlayer)
                 espEnabledSingle = false
                 if setESPBtnState then setESPBtnState(false) end
             end
-            
+
             if spectateEnabled then
                 spectateEnabled = false
                 if setSpectateVisual then setSpectateVisual(false) end
-                if player.Character then 
+                if player.Character then
                     local ph = player.Character:FindFirstChildOfClass("Humanoid")
-                    if ph then camera.CameraSubject = ph end 
+                    if ph then camera.CameraSubject = ph end
                 end
             end
-            
+
             if loopTPEnabled then
                 loopTPEnabled = false
                 if setLoopTPVisual then setLoopTPVisual(false) end
-                if connections.loop then 
+                if connections.loop then
                     connections.loop:Disconnect()
                     connections.loop = nil
                 end
             end
-            
+
             if SearchBox then SearchBox.Text = "" end
         end
     end
-    
+
     Players.PlayerRemoving:Connect(onPlayerRemoving)
     connections.playerRemoving = onPlayerRemoving
 end
@@ -4913,20 +5264,20 @@ local function updateTrackedPlayer(playerFound)
     if playerFound then
         currentTarget = playerFound
         trackedPlayer = playerFound
-        
+
         if PlayerImg and PlayerName then
-            local ok, thumb = pcall(function() 
-                return Players:GetUserThumbnailAsync(playerFound.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420) 
+            local ok, thumb = pcall(function()
+                return Players:GetUserThumbnailAsync(playerFound.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
             end)
             PlayerImg.Image = (ok and thumb) and thumb or "rbxassetid://0"
-            
+
             if playerFound.DisplayName and playerFound.DisplayName ~= playerFound.Name then
                 PlayerName.Text = playerFound.DisplayName .. " (@" .. playerFound.Name .. ")"
             else
                 PlayerName.Text = playerFound.Name
             end
         end
-        
+
         if TeleToPlayer then TeleToPlayer.Visible = true end
         if SpectateBtn then SpectateBtn.Visible = true end
         if ESPBtn then ESPBtn.Visible = true end
@@ -4934,22 +5285,20 @@ local function updateTrackedPlayer(playerFound)
     else
         trackedPlayer = nil
         currentTarget = nil
-        
+
         if PlayerName then
             PlayerName.Text = "Nenhum jogador citado"
         end
         if PlayerImg then
             PlayerImg.Image = "rbxassetid://0"
         end
-        
+
         if TeleToPlayer then TeleToPlayer.Visible = false end
         if SpectateBtn then SpectateBtn.Visible = false end
         if ESPBtn then ESPBtn.Visible = false end
         if LoopTPBtn then LoopTPBtn.Visible = false end
     end
 end
-
--- ========== GUI ==========
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -4976,8 +5325,7 @@ pcall(function()
         syn.protect_gui(screenGui)
     end
 end)
--- Proteger GUI
----// MainFrame
+
 local MainFrame = Instance.new("Frame")
 MainFrame.Parent = screenGui
 MainFrame.Size = UDim2.new(0, 320, 0, 450)
@@ -4986,16 +5334,13 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(0,0,0)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 
--- Adicione isso depois de criar o MainFrame (por volta da linha 765)
--- Aplicar cantos arredondados e borda no MainFrame
-
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 12)  -- 12 pixels de arredondamento
+UICorner.CornerRadius = UDim.new(0, 12)
 UICorner.Parent = MainFrame
 
 local UIStroke = Instance.new("UIStroke")
 UIStroke.Thickness = 2
-UIStroke.Color = Color3.fromRGB(0, 0, 0)  -- Azul claro
+UIStroke.Color = Color3.fromRGB(0, 0, 0)
 UIStroke.Transparency = 0.2
 UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 UIStroke.Parent = MainFrame
@@ -5015,7 +5360,6 @@ for _,v in ipairs(MainFrame:GetDescendants()) do
     end
 end
 
----// DRAG COMPLETO
 local UIS = game:GetService("UserInputService")
 local dragging = false
 local dragStart, startPos
@@ -5086,7 +5430,6 @@ MinimizeBox.TextColor3 = Color3.fromRGB(255,255,255)
 Instance.new("UICorner", MinimizeBox).CornerRadius = UDim.new(0,6)
 MinimizeBox.ZIndex = 4
 
--- BOTÃO FECHAR
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Name = "CloseBtn"
 CloseBtn.Parent = TopBar
@@ -5109,66 +5452,53 @@ local CloseCorner = Instance.new("UICorner")
 CloseCorner.CornerRadius = UDim.new(0,6)
 CloseCorner.Parent = CloseBtn
 
--- EVENTO DO BOTÃO
 CloseBtn.MouseButton1Click:Connect(function()
 
-    -- EVITA EXECUTAR 2X
     if guiClosed then
         return
     end
 
     guiClosed = true
 
-    -- DESATIVA SISTEMAS
     allEspEnabled = false
     espEnabledSingle = false
     loopTPEnabled = false
     spectateEnabled = false
     hackerScannerEnabled = false
 
-    -- PARA O SCANNER HACKER
     pcall(function()
 
-        -- limpa textbox
         if HackerSearchBox then
             HackerSearchBox.Text = ""
         end
 
-        -- limpa highlights
         clearESP()
 
-        -- desconecta scanner
         if scannerConnection then
             scannerConnection:Disconnect()
             scannerConnection = nil
         end
 
-        -- cancela debounce
         if debounceThread then
             task.cancel(debounceThread)
             debounceThread = nil
         end
 
-        -- invalida buscas antigas
         currentSearchId += 1
 
-        -- limpa contador
         if HackerCounter then
             HackerCounter.Text = "[0] objetos detectados"
         end
     end)
 
-    -- LIMPA ESPS GERAIS
     pcall(function()
         clearAllESP()
     end)
 
-    -- LIMPA OBJETOS ANTIGOS
     pcall(function()
         clearObjectESP()
     end)
 
-    -- DESCONECTA CONEXÕES
     for _, conn in pairs(connections or {}) do
         if conn and typeof(conn) == "RBXScriptConnection" then
             pcall(function()
@@ -5177,7 +5507,6 @@ CloseBtn.MouseButton1Click:Connect(function()
         end
     end
 
-    -- DESCONECTA BOTÕES
     for _, conn in pairs(buttonConnections or {}) do
         if conn and typeof(conn) == "RBXScriptConnection" then
             pcall(function()
@@ -5186,7 +5515,6 @@ CloseBtn.MouseButton1Click:Connect(function()
         end
     end
 
-    -- DESTROI GUI
     local gui =
         screenGui
         or CloseBtn:FindFirstAncestorOfClass("ScreenGui")
@@ -5198,7 +5526,6 @@ end)
 
 CloseBtn.ZIndex = 4
 
--- Content scroll
 local Content = Instance.new("ScrollingFrame", MainFrame)
 Content.Position = UDim2.new(0,8,0,56)
 Content.Size = UDim2.new(1,-16,1,-72)
@@ -5213,7 +5540,6 @@ UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     Content.CanvasSize = UDim2.new(0,0,0, UIList.AbsoluteContentSize.Y + 12)
 end)
 
--- Player display
 local PlayerFrame = Instance.new("Frame", Content)
 PlayerFrame.Size = UDim2.new(0.95,0,0,96)
 PlayerFrame.BackgroundColor3 = Color3.fromRGB(28,28,28)
@@ -5239,7 +5565,6 @@ PlayerName.TextSize = 15
 PlayerName.TextXAlignment = Enum.TextXAlignment.Left
 PlayerName.ZIndex = 5
 
--- ================= SEARCHBOX + PLAYER PICKER =================
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 
@@ -5412,31 +5737,29 @@ Players.PlayerRemoving:Connect(function(p)
 	removePlayerItem(p)
 end)
 
--- ================= END SEARCHBOX + PLAYER PICKER =================
-
 local buttonClickCooldowns = {}
 
 local function flashBlue(btn, dur)
     if not btn or not btn.Parent then return end
-    
+
     if buttonClickCooldowns[btn] then
         return
     end
-    
+
     buttonClickCooldowns[btn] = true
     task.delay(0.3, function()
         buttonClickCooldowns[btn] = nil
     end)
-    
+
     local orig = btn.BackgroundColor3
     btn.BackgroundColor3 = Color3.fromRGB(0,150,255)
-    
+
     local restoreColor = function()
         if btn and btn.Parent then
             btn.BackgroundColor3 = orig
         end
     end
-    
+
     task.spawn(function()
         task.wait(dur or 0.18)
         restoreColor()
@@ -5483,7 +5806,7 @@ local function updatePlayerDisplay(p)
     if p then
         local ok, thumb = pcall(function() return Players:GetUserThumbnailAsync(p.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420) end)
         PlayerImg.Image = (ok and thumb) and thumb or "rbxassetid://0"
-        
+
         if p.DisplayName and p.DisplayName ~= p.Name then
             PlayerName.Text = p.DisplayName .. " (@" .. p.Name .. ")"
         else
@@ -5495,9 +5818,6 @@ local function updatePlayerDisplay(p)
     end
 end
 
--- ========== GUI elements and wiring ==========
-
--- Track & Random
 local TrackBtn = makeButton("Rastrear próximo", 36)
 TrackBtn.MouseButton1Click:Connect(function()
     flashBlue(TrackBtn)
@@ -5511,11 +5831,11 @@ TrackBtn.MouseButton1Click:Connect(function()
             end
         end
     end
-    if closest then 
+    if closest then
         SearchBox.Text = closest.Name
         currentTarget = closest
         trackedPlayer = closest
-        updatePlayerDisplay(closest) 
+        updatePlayerDisplay(closest)
     end
 end)
 
@@ -5523,8 +5843,8 @@ local RandomBtn = makeButton("Jogador Aleatório")
 RandomBtn.MouseButton1Click:Connect(function()
     flashBlue(RandomBtn)
     local pool = {}
-    for _, p in pairs(Players:GetPlayers()) do 
-        if p ~= player then table.insert(pool, p) end 
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player then table.insert(pool, p) end
     end
     if #pool > 0 then
         local rnd = pool[math.random(1, #pool)]
@@ -5535,7 +5855,6 @@ RandomBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Speed input & set
 local SpeedBox = Instance.new("TextBox", Content)
 SpeedBox.Size = UDim2.new(0.95,0,0,36)
 SpeedBox.BackgroundColor3 = Color3.fromRGB(38,38,38)
@@ -5556,41 +5875,37 @@ SpeedSet.MouseButton1Click:Connect(function()
         speedValue = v
         if humanoid then
             humanoid.WalkSpeed = v
-        else
         end
     end
 end)
 
--- ESP single
 local ESPBtn, setESPBtnState, getESPBtnState = makeToggle("ESP Player", 34)
 ESPBtn.Visible = false
 ESPBtn.MouseButton1Click:Connect(function()
     if not currentTarget then return end
     espEnabledSingle = not espEnabledSingle
     setESPBtnState(espEnabledSingle)
-    if espEnabledSingle then 
-        createESPFor(currentTarget) 
-    else 
-        removeESPFor(currentTarget) 
+    if espEnabledSingle then
+        createESPFor(currentTarget)
+    else
+        removeESPFor(currentTarget)
     end
 end)
 
--- ESP all
 local ESPAllBtn, setESPAllVisual, getESPAll = makeToggle("ESP All Players", 34)
 setESPAllVisual(allEspEnabled)
 ESPAllBtn.MouseButton1Click:Connect(function()
     allEspEnabled = not allEspEnabled
     setESPAllVisual(allEspEnabled)
     if allEspEnabled then
-        for _, p in pairs(Players:GetPlayers()) do 
-            if p ~= player then createESPFor(p) end 
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= player then createESPFor(p) end
         end
     else
         clearAllESP()
     end
 end)
 
--- Spectate
 local SpectateBtn, setSpectateVisual = makeToggle("Spectate Player", 34)
 SpectateBtn.Visible = false
 SpectateBtn.MouseButton1Click:Connect(function()
@@ -5601,14 +5916,13 @@ SpectateBtn.MouseButton1Click:Connect(function()
         local hum = currentTarget.Character:FindFirstChildOfClass("Humanoid")
         if hum then camera.CameraSubject = hum end
     else
-        if player.Character then 
+        if player.Character then
             local ph = player.Character:FindFirstChildOfClass("Humanoid")
-            if ph then camera.CameraSubject = ph end 
+            if ph then camera.CameraSubject = ph end
         end
     end
 end)
 
--- Loop TP
 local LoopTPBtn, setLoopTPVisual = makeToggle("Loop Teleport", 34)
 LoopTPBtn.Visible = false
 LoopTPBtn.MouseButton1Click:Connect(function()
@@ -5628,7 +5942,6 @@ LoopTPBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Teleport to player
 local TeleToPlayer = makeButton("Teleport to Player")
 TeleToPlayer.Visible = false
 TeleToPlayer.MouseButton1Click:Connect(function()
@@ -5636,13 +5949,12 @@ TeleToPlayer.MouseButton1Click:Connect(function()
     if currentTarget and currentTarget.Character and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local r = player.Character.HumanoidRootPart
         local tr = currentTarget.Character:FindFirstChild("HumanoidRootPart")
-        if r and tr then 
+        if r and tr then
             r.CFrame = tr.CFrame * CFrame.new(0,0,tpDistanceStuds)
         end
     end
 end)
 
--- Position teleport
 local PosBox = Instance.new("TextBox", Content)
 PosBox.Size = UDim2.new(0.95,0,0,36)
 PosBox.BackgroundColor3 = Color3.fromRGB(38,38,38)
@@ -5674,14 +5986,8 @@ GetPosBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- =============================================
--- ===== TEXTBOX HACKER =====
--- =============================================
-
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-
--- ================= UI =================
 
 local HackerDivider = Instance.new("Frame", Content)
 HackerDivider.Size = UDim2.new(0.95, 0, 0, 2)
@@ -5726,19 +6032,13 @@ HackerCounter.Font = Enum.Font.Code
 HackerCounter.TextSize = 11
 HackerCounter.ZIndex = 4
 
--- ================= CONFIG =================
-
 local MAX_HIGHLIGHTS = 300
 local SEARCH_DELAY = 0.35
-
--- ================= SISTEMA =================
 
 local objectHighlights = {}
 local currentSearchId = 0
 local scannerConnection = nil
 local debounceThread = nil
-
--- ================= GLITCH =================
 
 task.spawn(function()
     while HackerSearchBox.Parent do
@@ -5751,8 +6051,6 @@ task.spawn(function()
         task.wait(0.03)
     end
 end)
-
--- ================= FUNÇÕES =================
 
 local function updateCounter()
     local count = 0
@@ -5858,7 +6156,6 @@ local function startSearch(searchText)
                 end
             end
 
-            -- evita travamento
             if i % 100 == 0 then
                 task.wait()
             end
@@ -5867,7 +6164,6 @@ local function startSearch(searchText)
         updateCounter()
     end)
 
-    -- monitora novos objetos
     if scannerConnection then
         scannerConnection:Disconnect()
     end
@@ -5900,13 +6196,10 @@ local function stopScanner()
     clearESP()
 end
 
--- ================= EVENTOS =================
-
 HackerSearchBox:GetPropertyChangedSignal("Text"):Connect(function()
 
     local text = HackerSearchBox.Text
 
-    -- debounce
     if debounceThread then
         task.cancel(debounceThread)
     end
@@ -5941,8 +6234,6 @@ HackerSearchBox.FocusLost:Connect(function()
     end
 end)
 
--- ================= CLEANUP =================
-
 script.Destroying:Connect(function()
 
     stopScanner()
@@ -5952,8 +6243,6 @@ script.Destroying:Connect(function()
     end
 end)
 
--- ========== BOTÕES PERSONALIZADOS NO FINAL ==========
--- Criar uma linha divisória antes dos botões personalizados
 local Divider = Instance.new("Frame", Content)
 Divider.Size = UDim2.new(0.95, 0, 0, 2)
 Divider.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
@@ -5961,7 +6250,6 @@ Divider.BorderSizePixel = 0
 Instance.new("UICorner", Divider).CornerRadius = UDim.new(0, 2)
 Divider.ZIndex = 4
 
--- Criar título para botões personalizados
 local CustomTitle = Instance.new("TextLabel", Content)
 CustomTitle.Size = UDim2.new(0.95, 0, 0, 30)
 CustomTitle.BackgroundTransparency = 1
@@ -5971,7 +6259,6 @@ CustomTitle.Font = Enum.Font.GothamBold
 CustomTitle.TextSize = 14
 CustomTitle.ZIndex = 4
 
--- ========== TEXTBOX DE PESQUISA DE BOTÕES ==========
 searchBoxCustom = Instance.new("TextBox", Content)
 searchBoxCustom.Size = UDim2.new(0.95, 0, 0, 36)
 searchBoxCustom.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
@@ -5990,10 +6277,9 @@ searchGlow.Color = Color3.fromRGB(80, 80, 180)
 searchGlow.Thickness = 1
 searchGlow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
--- ========== FUNÇÃO DE PESQUISA DOS BOTÕES ==========
 local function filterCustomButtons(searchText)
     local searchLower = string.lower(searchText or "")
-    
+
     if searchLower == "" then
         for btnName, btnFrame in pairs(customButtonFrames) do
             if btnFrame and btnFrame.Parent then
@@ -6002,9 +6288,9 @@ local function filterCustomButtons(searchText)
         end
         return
     end
-    
+
     local firstVisible = nil
-    
+
     for btnName, btnFrame in pairs(customButtonFrames) do
         if btnFrame and btnFrame.Parent then
             local btnTextLower = string.lower(btnFrame.Text)
@@ -6018,8 +6304,7 @@ local function filterCustomButtons(searchText)
             end
         end
     end
-    
-    -- Rolar até o primeiro botão visível
+
     if firstVisible then
         task.spawn(function()
             task.wait(0.05)
@@ -6034,11 +6319,10 @@ searchBoxCustom:GetPropertyChangedSignal("Text"):Connect(function()
     filterCustomButtons(searchBoxCustom.Text)
 end)
 
--- ========== ATALHO Ctrl+F PARA FOCAR NA PESQUISA DE BOTÕES ==========
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.UserInputType == Enum.UserInputType.Keyboard then
-        -- Ctrl+F para focar na pesquisa de botões
+
         if input.KeyCode == Enum.KeyCode.F and (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)) then
             pcall(function()
                 searchBoxCustom:CaptureFocus()
@@ -6047,16 +6331,14 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- Criar botões personalizados
 for buttonName, buttonData in pairs(Buttons) do
     createCustomButton(buttonName, buttonData, Content)
 end
 
--- Search behavior (jogadores)
 SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
     local txt = tostring(SearchBox.Text or "")
     currentTarget = nil
-    
+
     if txt ~= "" then
         local foundPlayer = findPlayerByNameOrDisplayName(txt)
         if foundPlayer then
@@ -6067,7 +6349,7 @@ SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
     else
         updatePlayerDisplay(nil)
     end
-    
+
     local need = currentTarget ~= nil
     TeleToPlayer.Visible = need
     SpectateBtn.Visible = need
@@ -6075,7 +6357,6 @@ SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
     LoopTPBtn.Visible = need
 end)
 
--- ========== MINIMIZE KEY (APENAS A TECLA ESCOLHIDA - CORRIGIDO) ==========
 MinimizeBox:GetPropertyChangedSignal("Text"):Connect(function()
     if #MinimizeBox.Text > 0 then
         local char = string.sub(MinimizeBox.Text, 1, 1)
@@ -6092,13 +6373,13 @@ local function onMinimizeInput(input, gameProcessed)
     if gameProcessed then return end
     if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
     local keyPressed = input.KeyCode.Name
-    
+
     if string.upper(keyPressed) == minimizeKey then
         local focusedTextBox = nil
         pcall(function()
             focusedTextBox = UserInputService:GetFocusedTextBox()
         end)
-        
+
         if not focusedTextBox then
             MainFrame.Visible = not MainFrame.Visible
         end
@@ -6114,36 +6395,33 @@ end
 
 _G.trollGuiMinimizeConnection = UserInputService.InputBegan:Connect(onMinimizeInput)
 
--- Initialize UI visuals
 setESPAllVisual(allEspEnabled)
 
--- Cleanup on destroy
 MainFrame.Destroying:Connect(function()
-    -- Desconectar tecla de atalho
+
     if _G.trollGuiMinimizeConnection then
         pcall(function() _G.trollGuiMinimizeConnection:Disconnect() end)
         _G.trollGuiMinimizeConnection = nil
     end
-    
-    -- Parar scanner hacker
+
     stopRealTimeScanner()
-    
+
     if glitchConnection then
         glitchConnection:Disconnect()
     end
-    
+
     for k, conn in pairs(connections) do
         if conn and type(conn) == "userdata" and conn.Disconnect then
             pcall(function() conn:Disconnect() end)
         end
     end
-    
+
     for btnName, conn in pairs(buttonConnections) do
         if conn and type(conn) == "userdata" then
             pcall(function() conn:Disconnect() end)
         end
     end
-    
+
     for _, name in pairs({"espAll","loop"}) do
         if connections[name] and type(connections[name]) == "userdata" then
             pcall(function() connections[name]:Disconnect() end)
@@ -6153,7 +6431,6 @@ MainFrame.Destroying:Connect(function()
     clearObjectESP()
 end)
 
--- ========== Drag everywhere (but ignore interactive elements) ==========
 do
     local UIS = UserInputService
     local dragging = false
@@ -6201,10 +6478,8 @@ do
     end)
 end
 
--- ========== INICIALIZAR SISTEMA DE NOTIFICAÇÃO ==========
 setupPlayerLeaveNotification()
 
--- SISTEMA DE COMANDOS NO CHAT
 local function levenshteinDistance(s1, s2)
     s1, s2 = s1:lower(), s2:lower()
     local len1, len2 = #s1, #s2
@@ -6257,17 +6532,17 @@ end
 player.Chatted:Connect(function(message)
     local msg = string.lower(message)
     if msg:sub(1,1) ~= "/" and msg:sub(1,1) ~= ";" and msg:sub(1,1) ~= ":" then return end
-    
+
     local command = msg:sub(2)
     if command == "" then return end
-    
+
     local turnOn = true
     local searchName = command
     if command:sub(-4) == " off" then
         turnOn = false
         searchName = command:sub(1, -5)
     end
-    
+
     local btnKey, btnData = findClosestButtonName(searchName)
     if not btnKey or not btnData then return end
 
@@ -6292,4 +6567,100 @@ player.Chatted:Connect(function(message)
             end)
         end
     end
+end)
+
+local TextChatService = game:GetService("TextChatService")
+
+local textChannels = TextChatService:WaitForChild("TextChannels", 5)
+
+if textChannels then
+
+	local generalChannel = textChannels:FindFirstChild("RBXGeneral")
+
+	if generalChannel then
+		local mensagem = "[TrollGui] Boas-vindas ao TrollGui!"
+		local corHexadecimal = "#00FFFF"
+
+		local mensagemFormatada = string.format(
+			"<font color='%s'><b>%s</b></font>",
+			corHexadecimal,
+			mensagem
+		)
+
+		generalChannel:DisplaySystemMessage(mensagemFormatada)
+	end
+end
+
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local oldGui = playerGui:FindFirstChild("TrollGuiInvisible")
+if oldGui then
+	oldGui:Destroy()
+end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "TrollGuiInvisible"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = playerGui
+
+local button = Instance.new("TextButton")
+button.Name = "MouseUnlock"
+button.Size = UDim2.fromOffset(1, 1)
+button.Position = UDim2.fromOffset(0, 0)
+button.BackgroundTransparency = 1
+button.TextTransparency = 1
+button.Text = ""
+button.Modal = true
+button.Active = true
+button.Selectable = false
+button.Visible = false
+button.Parent = gui
+
+local mouseReleased = false
+
+local originalMouseBehavior = UserInputService.MouseBehavior
+local originalMouseIconEnabled = UserInputService.MouseIconEnabled
+local originalCameraMode = player.CameraMode
+
+local function releaseMouse(released)
+	mouseReleased = released
+
+	if released then
+		button.Visible = true
+
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		UserInputService.MouseIconEnabled = true
+
+	else
+		button.Visible = false
+		UserInputService.MouseBehavior = originalMouseBehavior
+		UserInputService.MouseIconEnabled = originalMouseIconEnabled
+		player.CameraMode = originalCameraMode
+	end
+end
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if input.KeyCode == Enum.KeyCode.LeftAlt
+		or input.KeyCode == Enum.KeyCode.RightAlt then
+
+		releaseMouse(true)
+	end
+end)
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+	if input.KeyCode == Enum.KeyCode.LeftAlt
+		or input.KeyCode == Enum.KeyCode.RightAlt then
+
+		releaseMouse(false)
+	end
+end)
+RunService.RenderStepped:Connect(function()
+	if mouseReleased then
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		UserInputService.MouseIconEnabled = true
+	end
 end)
