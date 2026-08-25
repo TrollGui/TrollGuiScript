@@ -1,0 +1,4211 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local PathfindingService = game:GetService("PathfindingService")
+
+local guiVisible = true
+local isMinimized = false
+local isDragging = false
+local dragStart = nil
+local startPos = nil
+local toggle1Active = false
+local toggle2Active = false
+local toggle3Active = false
+local toggle4Active = false
+local toggle5Active = false
+local toggle1Loop = nil
+local undergroundFunction = nil
+local proximityPromptFunction = nil
+local pathfindingFunction = nil
+local pathfindingCoroutine = nil
+local pathfindingActive = false
+local hinoCoroutine = nil
+local hinoRunning = false
+
+local function enviarMensagem(texto)
+    if texto == "" then
+
+        return true
+    end
+
+    local chatService = game:GetService("Chat")
+
+    if chatService then
+        local sendEvent = chatService:FindFirstChild("SendMessage")
+        if sendEvent then
+            sendEvent:FireServer(texto)
+                        return true
+        end
+
+        local chat = chatService:FindFirstChild("Chat")
+        if chat then
+            local sendEvent2 = chat:FindFirstChild("SendMessage")
+            if sendEvent2 then
+                sendEvent2:FireServer(texto)
+                                return true
+            end
+        end
+    end
+
+    local success, err = pcall(function()
+        local defaultChat = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+        if defaultChat then
+            local sayMessage = defaultChat:FindFirstChild("SayMessageRequest")
+            if sayMessage then
+                sayMessage:FireServer(texto, "All")
+                                return true
+            end
+        end
+        return false
+    end)
+
+    if success then
+        return true
+    end
+
+    local success2, err2 = pcall(function()
+        local chatEvent = LocalPlayer:FindFirstChild("Chatted")
+        if chatEvent then
+            chatEvent:Fire(texto)
+                        return true
+        end
+        return false
+    end)
+
+    if success2 then
+        return true
+    end
+
+        return false
+end
+
+local function enviarHino()
+    if hinoRunning then
+                return
+    end
+
+    hinoRunning = true
+
+    for i, linha in ipairs(hinoBrasil) do
+
+        if not toggle5Active then
+                        hinoRunning = false
+            return
+        end
+
+        if linha ~= "" then
+            enviarMensagem(linha)
+        end
+
+        wait(1.5)
+    end
+
+        hinoRunning = false
+end
+
+local PathFinding = {
+    Nome = "PathFinding",
+    IsToggle = true,
+    Repeat = false,
+
+    Script = (function()
+
+        local TARGET_POSITION = Vector3.new(20.71, 3.04, -974.72)
+        local isRunning = false
+        local stopPathfinding = false
+        local currentCoroutine = nil
+
+        local function walkToTarget()
+            local player = Players.LocalPlayer
+            local character = player.Character or player.CharacterAdded:Wait()
+            local humanoid = character:WaitForChild("Humanoid")
+            local rootPart = character:WaitForChild("HumanoidRootPart")
+
+            if not rootPart or not humanoid then return end
+
+            local path = PathfindingService:CreatePath({
+                AgentRadius = 2,
+                AgentHeight = 5,
+                AgentCanJump = true,
+                AgentCanClimb = true,
+                WaypointSpacing = 3,
+            })
+
+            local success, errorMessage = pcall(function()
+                path:ComputeAsync(rootPart.Position, TARGET_POSITION)
+            end)
+
+            if not success then
+                                return
+            end
+
+            if path.Status ~= Enum.PathStatus.Success then
+                                return
+            end
+
+            local waypoints = path:GetWaypoints()
+
+            for i, waypoint in ipairs(waypoints) do
+                if stopPathfinding or not pathfindingActive then
+                    humanoid:MoveTo(rootPart.Position)
+                    return
+                end
+
+                if path.Status ~= Enum.PathStatus.Success then
+                    break
+                end
+
+                if waypoint.Action == Enum.PathWaypointAction.Jump then
+                    humanoid.Jump = true
+                end
+
+                humanoid:MoveTo(waypoint.Position)
+
+                local reached = humanoid.MoveToFinished:Wait()
+
+                if not reached then
+                    if pathfindingActive and not stopPathfinding then
+                        walkToTarget()
+                    end
+                    return
+                end
+            end
+
+            if pathfindingActive and not stopPathfinding then
+                            end
+        end
+
+        local function startPathfinding()
+            if currentCoroutine then
+                coroutine.close(currentCoroutine)
+                currentCoroutine = nil
+            end
+
+            stopPathfinding = false
+
+            currentCoroutine = coroutine.create(function()
+                while pathfindingActive and not stopPathfinding do
+                    local player = Players.LocalPlayer
+                    local character = player.Character or player.CharacterAdded:Wait()
+                    local rootPart = character:WaitForChild("HumanoidRootPart")
+
+                    if not rootPart then break end
+
+                    local path = PathfindingService:CreatePath({
+                        AgentRadius = 2,
+                        AgentHeight = 5,
+                        AgentCanJump = true,
+                        AgentCanClimb = true,
+                        WaypointSpacing = 3,
+                    })
+
+                    local success = pcall(function()
+                        path:ComputeAsync(rootPart.Position, TARGET_POSITION)
+                    end)
+
+                    if not success or path.Status ~= Enum.PathStatus.Success then
+                        walkToTarget()
+                    else
+                        local connection
+                        connection = path.Blocked:Connect(function(blockedWaypointIndex)
+                            connection:Disconnect()
+                            if pathfindingActive and not stopPathfinding then
+                                walkToTarget()
+                            end
+                        end)
+
+                        walkToTarget()
+
+                        if connection then
+                            connection:Disconnect()
+                        end
+                    end
+
+                    task.wait(0.5)
+                end
+            end)
+
+            coroutine.resume(currentCoroutine)
+        end
+
+        return function(state)
+            pathfindingActive = state
+
+            if state then
+                stopPathfinding = false
+                startPathfinding()
+            else
+                stopPathfinding = true
+                pathfindingActive = false
+
+                if currentCoroutine then
+                    coroutine.close(currentCoroutine)
+                    currentCoroutine = nil
+                end
+
+                local player = Players.LocalPlayer
+                local character = player.Character
+                if character then
+                    local humanoid = character:FindFirstChild("Humanoid")
+                    if humanoid then
+                        humanoid:MoveTo(Vector3.new(0, 0, 0))
+                    end
+                end
+
+                            end
+        end
+
+    end)()
+}
+
+pathfindingFunction = PathFinding.Script
+
+local Underground = {
+    Nome = "Underground",
+    IsToggle = true,
+    Repeat = false,
+
+    Script = (function()
+
+        local SavedData = {}
+
+        return function(state)
+
+            local animationTime = 0.5
+
+            local Players = game:GetService("Players")
+            local TweenService = game:GetService("TweenService")
+
+            local player = Players.LocalPlayer
+            local character = player.Character or player.CharacterAdded:Wait()
+
+            local humanoid = character:WaitForChild("Humanoid")
+            local root = character:WaitForChild("HumanoidRootPart")
+            local camera = workspace.CurrentCamera
+
+            if state then
+
+                SavedData = {
+
+                    CFrame = root.CFrame,
+
+                    WalkSpeed = humanoid.WalkSpeed,
+                    JumpPower = humanoid.JumpPower,
+                    UseJumpPower = humanoid.UseJumpPower,
+                    AutoRotate = humanoid.AutoRotate,
+                    PlatformStand = humanoid.PlatformStand,
+
+                    CameraSubject = camera.CameraSubject,
+                    CameraType = camera.CameraType,
+
+                    Velocity = root.AssemblyLinearVelocity,
+                    AngularVelocity = root.AssemblyAngularVelocity,
+
+                    Anchored = root.Anchored,
+
+                    State = humanoid:GetState()
+
+                }
+
+                local cameraPart = workspace:FindFirstChild("UndergroundCameraPoint")
+
+                if not cameraPart then
+
+                    cameraPart = Instance.new("Part")
+                    cameraPart.Name = "UndergroundCameraPoint"
+                    cameraPart.Size = Vector3.new(.1,.1,.1)
+                    cameraPart.Transparency = 1
+                    cameraPart.CanCollide = false
+                    cameraPart.Anchored = true
+                    cameraPart.Parent = workspace
+
+                end
+
+                cameraPart.CFrame = root.CFrame + Vector3.new(0,1.5,0)
+
+                camera.CameraType = Enum.CameraType.Custom
+                camera.CameraSubject = cameraPart
+
+                humanoid.AutoRotate = false
+                humanoid.PlatformStand = true
+
+                root.Anchored = false
+
+                local tween = TweenService:Create(
+                    root,
+                    TweenInfo.new(animationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    {
+                        CFrame = root.CFrame * CFrame.new(0,-15,0)
+                    }
+                )
+
+                tween:Play()
+
+                tween.Completed:Connect(function()
+
+                    if state then
+                        root.Anchored = true
+                    end
+
+                end)
+
+            else
+
+                if not SavedData.CFrame then
+                    return
+                end
+
+                local cameraPart = workspace:FindFirstChild("UndergroundCameraPoint")
+
+                root.Anchored = false
+
+                local tween = TweenService:Create(
+                    root,
+                    TweenInfo.new(animationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    {
+                        CFrame = SavedData.CFrame
+                    }
+                )
+
+                tween:Play()
+
+                tween.Completed:Connect(function()
+
+                    root.Anchored = SavedData.Anchored
+
+                    humanoid.PlatformStand = SavedData.PlatformStand
+                    humanoid.AutoRotate = SavedData.AutoRotate
+
+                    humanoid.WalkSpeed = SavedData.WalkSpeed
+                    humanoid.UseJumpPower = SavedData.UseJumpPower
+
+                    if SavedData.UseJumpPower then
+                        humanoid.JumpPower = SavedData.JumpPower
+                    end
+
+                    root.AssemblyLinearVelocity = SavedData.Velocity
+                    root.AssemblyAngularVelocity = SavedData.AngularVelocity
+
+                    humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+
+                    task.wait()
+
+                    humanoid:ChangeState(SavedData.State)
+
+                    camera.CameraType = SavedData.CameraType
+                    camera.CameraSubject = SavedData.CameraSubject
+
+                    if cameraPart then
+                        cameraPart:Destroy()
+                    end
+
+                    table.clear(SavedData)
+
+                end)
+
+            end
+
+        end
+
+    end)()
+}
+
+undergroundFunction = Underground.Script
+
+local BotaoTesteX = {
+    Nome = "ProximityPrompt Insta",
+    IsToggle = true,
+    Repeat = false,
+    Script = function(State)
+        local ProximityPromptService = game:GetService("ProximityPromptService")
+
+        _G.PromptBackup = _G.PromptBackup or {}
+
+        if State then
+            for _, prompt in ipairs(game:GetDescendants()) do
+                if prompt:IsA("ProximityPrompt") then
+                    if not _G.PromptBackup[prompt] then
+                        _G.PromptBackup[prompt] = {
+                            HoldDuration = prompt.HoldDuration,
+                            MaxActivationDistance = prompt.MaxActivationDistance
+                        }
+                    end
+
+                    prompt.HoldDuration = 0
+                    prompt.MaxActivationDistance = 20
+                end
+            end
+
+            _G.PromptConn = game.DescendantAdded:Connect(function(obj)
+                if obj:IsA("ProximityPrompt") then
+                    _G.PromptBackup[obj] = {
+                        HoldDuration = obj.HoldDuration,
+                        MaxActivationDistance = obj.MaxActivationDistance
+                    }
+
+                    obj.HoldDuration = 0
+                    obj.MaxActivationDistance = 20
+                end
+            end)
+
+        else
+            if _G.PromptConn then
+                _G.PromptConn:Disconnect()
+                _G.PromptConn = nil
+            end
+
+            for prompt, data in pairs(_G.PromptBackup) do
+                if prompt and prompt.Parent then
+                    prompt.HoldDuration = data.HoldDuration
+                    prompt.MaxActivationDistance = data.MaxActivationDistance
+                end
+            end
+
+            _G.PromptBackup = {}
+        end
+    end
+}
+
+proximityPromptFunction = BotaoTesteX.Script
+
+local function createMainGUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "Exército Brasileiro 🔊 RP Script"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.DisplayOrder = 999
+
+    local success, coreGui = pcall(function()
+        return game:GetService("CoreGui")
+    end)
+
+    if success and coreGui then
+        screenGui.Parent = coreGui
+    else
+        screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    end
+
+    local function protectGUI()
+        if not screenGui or not screenGui.Parent then
+            return
+        end
+
+        local function onChildRemoved(child)
+            if child == screenGui then
+                wait(0.1)
+                if not screenGui.Parent then
+                    local newParent = coreGui or LocalPlayer:WaitForChild("PlayerGui")
+                    screenGui.Parent = newParent
+                end
+            end
+        end
+
+        if screenGui.Parent then
+            screenGui.Parent.ChildRemoved:Connect(onChildRemoved)
+        end
+    end
+
+    protectGUI()
+
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 350, 0, 550)
+    mainFrame.Position = UDim2.new(0.5, -175, 0.5, -275)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    mainFrame.BackgroundTransparency = 0.95
+    mainFrame.BorderSizePixel = 0
+    mainFrame.ClipsDescendants = true
+    mainFrame.Parent = screenGui
+
+    local shadow = Instance.new("Frame")
+    shadow.Name = "Shadow"
+    shadow.Size = UDim2.new(1, 10, 1, 10)
+    shadow.Position = UDim2.new(0, -5, 0, -5)
+    shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    shadow.BackgroundTransparency = 0.6
+    shadow.BorderSizePixel = 0
+    shadow.Parent = mainFrame
+
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 40, 60)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 35))
+    })
+    gradient.Parent = mainFrame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = mainFrame
+
+    local titleBar = Instance.new("Frame")
+    titleBar.Name = "TitleBar"
+    titleBar.Size = UDim2.new(1, 0, 0, 40)
+    titleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
+    titleBar.BackgroundTransparency = 0
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = mainFrame
+
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 12)
+    titleCorner.Parent = titleBar
+
+    local titleGradient = Instance.new("UIGradient")
+    titleGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(60, 60, 85)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(35, 35, 60))
+    })
+    titleGradient.Parent = titleBar
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Name = "TitleLabel"
+    titleLabel.Size = UDim2.new(1, -60, 1, 0)
+    titleLabel.Position = UDim2.new(0, 10, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = "Exército Brasileiro 🔊 RP Script"
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextSize = 18
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Font = Enum.Font.GothamSemibold
+    titleLabel.Parent = titleBar
+
+    local minimizeButton = Instance.new("TextButton")
+    minimizeButton.Name = "MinimizeButton"
+    minimizeButton.Size = UDim2.new(0, 30, 1, 0)
+    minimizeButton.Position = UDim2.new(1, -60, 0, 0)
+    minimizeButton.BackgroundTransparency = 1
+    minimizeButton.Text = "−"
+    minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    minimizeButton.TextSize = 24
+    minimizeButton.Font = Enum.Font.GothamBold
+    minimizeButton.Parent = titleBar
+
+    local closeButton = Instance.new("TextButton")
+    closeButton.Name = "CloseButton"
+    closeButton.Size = UDim2.new(0, 30, 1, 0)
+    closeButton.Position = UDim2.new(1, -30, 0, 0)
+    closeButton.BackgroundTransparency = 1
+    closeButton.Text = "X"
+    closeButton.TextColor3 = Color3.fromRGB(255, 100, 100)
+    closeButton.TextSize = 20
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.Parent = titleBar
+
+    local contentFrame = Instance.new("ScrollingFrame")
+    contentFrame.Name = "ContentFrame"
+    contentFrame.Size = UDim2.new(1, -20, 1, -60)
+    contentFrame.Position = UDim2.new(0, 10, 0, 50)
+    contentFrame.BackgroundTransparency = 1
+    contentFrame.BorderSizePixel = 0
+    contentFrame.ScrollBarThickness = 4
+    contentFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 120)
+    contentFrame.CanvasSize = UDim2.new(0, 0, 0, 650)
+    contentFrame.Parent = mainFrame
+
+    local uiListLayout = Instance.new("UIListLayout")
+    uiListLayout.Padding = UDim.new(0, 10)
+    uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    uiListLayout.Parent = contentFrame
+
+    local function createToggleButton(text, callback, description, color)
+        local toggleFrame = Instance.new("Frame")
+        toggleFrame.Name = "ToggleFrame"
+        toggleFrame.Size = UDim2.new(1, -10, 0, 60)
+        toggleFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+        toggleFrame.BackgroundTransparency = 0.8
+        toggleFrame.BorderSizePixel = 0
+        toggleFrame.Parent = contentFrame
+
+        local toggleCorner = Instance.new("UICorner")
+        toggleCorner.CornerRadius = UDim.new(0, 8)
+        toggleCorner.Parent = toggleFrame
+
+        local label = Instance.new("TextLabel")
+        label.Name = "Label"
+        label.Size = UDim2.new(0.7, -10, 1, 0)
+        label.Position = UDim2.new(0, 10, 0, 0)
+        label.BackgroundTransparency = 1
+        label.Text = text
+        label.TextColor3 = Color3.fromRGB(230, 230, 240)
+        label.TextSize = 14
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.TextYAlignment = Enum.TextYAlignment.Center
+        label.Font = Enum.Font.GothamMedium
+        label.Parent = toggleFrame
+
+        local descLabel = Instance.new("TextLabel")
+        descLabel.Name = "DescLabel"
+        descLabel.Size = UDim2.new(0.7, -10, 0, 16)
+        descLabel.Position = UDim2.new(0, 10, 0, 30)
+        descLabel.BackgroundTransparency = 1
+        descLabel.Text = description or ""
+        descLabel.TextColor3 = Color3.fromRGB(150, 150, 180)
+        descLabel.TextSize = 11
+        descLabel.TextXAlignment = Enum.TextXAlignment.Left
+        descLabel.Font = Enum.Font.Gotham
+        descLabel.Parent = toggleFrame
+
+        local toggleButton = Instance.new("TextButton")
+        toggleButton.Name = "ToggleButton"
+        toggleButton.Size = UDim2.new(0, 50, 0, 30)
+        toggleButton.Position = UDim2.new(1, -60, 0.5, -15)
+        toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+        toggleButton.BorderSizePixel = 0
+        toggleButton.Text = ""
+        toggleButton.Parent = toggleFrame
+
+        local toggleCorner2 = Instance.new("UICorner")
+        toggleCorner2.CornerRadius = UDim.new(1, 0)
+        toggleCorner2.Parent = toggleButton
+
+        local toggleIndicator = Instance.new("Frame")
+        toggleIndicator.Name = "Indicator"
+        toggleIndicator.Size = UDim2.new(0, 20, 0, 20)
+        toggleIndicator.Position = UDim2.new(0, 3, 0.5, -10)
+        toggleIndicator.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+        toggleIndicator.BorderSizePixel = 0
+        toggleIndicator.Parent = toggleButton
+
+        local indicatorCorner = Instance.new("UICorner")
+        indicatorCorner.CornerRadius = UDim.new(1, 0)
+        indicatorCorner.Parent = toggleIndicator
+
+        local statusLabel = Instance.new("TextLabel")
+        statusLabel.Name = "StatusLabel"
+        statusLabel.Size = UDim2.new(0, 30, 0, 20)
+        statusLabel.Position = UDim2.new(0, 25, 0.5, -10)
+        statusLabel.BackgroundTransparency = 1
+        statusLabel.Text = "OFF"
+        statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        statusLabel.TextSize = 10
+        statusLabel.Font = Enum.Font.GothamBold
+        statusLabel.Parent = toggleButton
+
+        local isActive = false
+
+        local function updateToggle(state)
+            isActive = state
+            if state then
+                local color = color or Color3.fromRGB(0, 150, 255)
+                toggleButton.BackgroundColor3 = color
+                toggleIndicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                toggleIndicator.Position = UDim2.new(1, -23, 0.5, -10)
+                statusLabel.Text = "ON"
+                statusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
+            else
+                toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+                toggleIndicator.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+                toggleIndicator.Position = UDim2.new(0, 3, 0.5, -10)
+                statusLabel.Text = "OFF"
+                statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            end
+        end
+
+        toggleButton.MouseButton1Click:Connect(function()
+            isActive = not isActive
+            updateToggle(isActive)
+            callback(isActive)
+        end)
+
+        return toggleFrame, function(state)
+            updateToggle(state)
+        end, isActive
+    end
+
+    local toggle1Frame, setToggle1State = createToggleButton(
+        "Fazer JJs",
+        function(state)
+            toggle1Active = state
+            if state then
+                local executionTime = 0.8
+
+                local function processChatCommand(msg)
+                    if string.sub(msg, 1, 1) == ";" then
+                        local numberStr = string.gsub(string.sub(msg, 2), ",", ".")
+                        local num = tonumber(numberStr)
+                        if num and num > 0 then
+                            executionTime = num
+                                                        return true
+                        end
+                    end
+                    return false
+                end
+
+                local chatConnection
+                chatConnection = LocalPlayer.Chatted:Connect(processChatCommand)
+
+                toggle1Loop = coroutine.create(function()
+                    while toggle1Active do
+                        local success = pcall(function()
+                            local Polichinelos = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Polichinelos")
+
+                            LocalPlayer:SetAttribute("Polichinelos", true)
+                            local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                            local humanoid = character:WaitForChild("Humanoid")
+                            local animator = humanoid:WaitForChild("Animator")
+                            local anim = animator:LoadAnimation(LocalPlayer.PlayerScripts:WaitForChild("Animations"):WaitForChild("Polichinelos"))
+                            anim:Play()
+
+                            task.wait(0.1)
+                            Polichinelos:FireServer("Add", 1)
+                        end)
+
+                        if not success then
+                                                    end
+
+                        task.wait(executionTime)
+                    end
+                end)
+                coroutine.resume(toggle1Loop)
+            else
+                toggle1Active = false
+            end
+        end,
+        "Seu jogador irá fazer JJs sozinho."
+    )
+
+    local toggle2Frame, setToggle2State = createToggleButton(
+        "🧱 Criar Blocos(1)",
+        function(state)
+            toggle2Active = state
+            if state then
+
+local pasta = Instance.new("Folder")
+pasta.Name = "PartesSalvasDoJosue"
+pasta.Parent = workspace
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(9.202255, 4.653641, 22.012451)
+    p.Position = Vector3.new(196.536896, 13.326820, -896.185181)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(12.196060, 4.364927, 22.116943)
+    p.Position = Vector3.new(207.225449, 13.424336, -896.200073)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(16.670776, 10.502916, 28.405579)
+    p.Position = Vector3.new(239.942703, 2.251458, -591.561707)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(16.684937, 10.596263, 28.534973)
+    p.Position = Vector3.new(239.922836, 2.298131, -563.223755)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(30.516327, 10.611104, 17.422546)
+    p.Position = Vector3.new(262.389526, 2.305552, -558.762085)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(17.897614, 10.602059, 47.192932)
+    p.Position = Vector3.new(276.581177, 2.301030, -582.596436)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(21.725525, 7.239732, 56.552795)
+    p.Position = Vector3.new(275.642609, 0.619866, -634.192993)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(21.810440, 8.365514, 39.538391)
+    p.Position = Vector3.new(275.577332, 0.410375, -625.721252)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(27.199463, 6.442314, 22.368774)
+    p.Position = Vector3.new(170.089600, 28.221157, -854.881042)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(9.610352, 8.426319, 22.400940)
+    p.Position = Vector3.new(178.864410, 33.213161, -854.879395)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(47.457901, 1.340362, 19.315674)
+    p.Position = Vector3.new(211.020065, 43.197403, -854.953369)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(3.590424, 8.517546, 5.007568)
+    p.Position = Vector3.new(155.204788, 1.258773, -859.960449)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(3.661240, 6.498161, 5.032959)
+    p.Position = Vector3.new(155.169373, 2.249080, -849.078247)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(3.595428, 13.604882, 5.071960)
+    p.Position = Vector3.new(155.202286, 6.705971, -854.457153)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(4.443634, 6.585807, 5.605957)
+    p.Position = Vector3.new(156.778168, 2.292903, -901.681763)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(4.467072, 14.066187, 5.091919)
+    p.Position = Vector3.new(156.766464, 6.516227, -896.416077)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(4.463135, 6.596398, 6.542358)
+    p.Position = Vector3.new(156.768433, 2.298199, -891.728821)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(2.877899, 4.646240, 16.960938)
+    p.Position = Vector3.new(158.002563, 37.323120, -896.474609)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(4.004700, 8.468693, 16.942322)
+    p.Position = Vector3.new(158.757782, 33.234344, -896.436157)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(6.000000, 4.098969, 21.551575)
+    p.Position = Vector3.new(192.000000, 17.049484, -896.316528)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(22.638550, 6.316046, 21.605774)
+    p.Position = Vector3.new(168.226791, 24.158024, -896.316406)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(32.366974, 12.796849, 20.652710)
+    p.Position = Vector3.new(229.574585, 15.398425, -896.966370)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(10.493820, 4.671080, 21.566895)
+    p.Position = Vector3.new(184.097687, 21.335541, -896.331421)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(4.394714, 0.200000, 14.098267)
+    p.Position = Vector3.new(378.802643, 28.008547, -895.158020)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(5.649261, 42.264908, 19.418030)
+    p.Position = Vector3.new(236.985336, 20.632713, -854.909729)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(3.879974, 8.916876, 21.841980)
+    p.Position = Vector3.new(308.226959, 15.458438, -855.009155)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(5.815094, 35.331871, 19.327393)
+    p.Position = Vector3.new(242.355484, 14.665936, -854.903320)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(5.883331, 25.960182, 19.467041)
+    p.Position = Vector3.new(247.941666, 9.980091, -854.933228)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(5.287384, 7.026422, 14.633179)
+    p.Position = Vector3.new(389.515869, 0.513211, -895.083618)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(6.000000, 13.125447, 14.667725)
+    p.Position = Vector3.new(384.000000, 3.562724, -895.157104)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(6.763306, 19.081055, 14.826172)
+    p.Position = Vector3.new(377.618347, 6.540528, -895.003174)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(33.109650, 25.039425, 14.818604)
+    p.Position = Vector3.new(357.662292, 9.519711, -894.995850)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(32.284821, 5.128056, 20.305908)
+    p.Position = Vector3.new(356.152405, 31.564028, -894.582397)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(10.977844, 35.837677, 13.939514)
+    p.Position = Vector3.new(334.924438, 16.161625, -895.330139)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(10.806030, 23.539682, 13.436768)
+    p.Position = Vector3.new(324.403015, 11.368752, -894.915649)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(11.242096, 24.880079, 13.230042)
+    p.Position = Vector3.new(313.378967, 4.797610, -895.109985)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(6.820770, 12.477581, 22.502563)
+    p.Position = Vector3.new(305.814606, 3.238791, -855.395630)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(7.723358, 8.832018, 22.406189)
+    p.Position = Vector3.new(305.138306, 1.416009, -855.367310)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(6.265839, 7.585854, 22.232300)
+    p.Position = Vector3.new(306.994934, 8.792927, -855.199219)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(2.922760, 6.000000, 22.397827)
+    p.Position = Vector3.new(301.538635, 0.000000, -855.416626)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(1.578186, 7.249668, 21.563538)
+    p.Position = Vector3.new(309.322998, 22.624834, -855.239990)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(2.261230, 7.573689, 5.103760)
+    p.Position = Vector3.new(311.114258, 2.786844, -849.837524)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(5.204620, 6.880002, 5.038635)
+    p.Position = Vector3.new(309.602295, 3.129004, -860.745850)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(35.984985, 10.435111, 24.175720)
+    p.Position = Vector3.new(375.979126, 2.217556, -854.490723)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(15.785461, 15.398211, 23.941772)
+    p.Position = Vector3.new(360.473450, 4.699106, -854.338135)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(17.991882, 13.723820, 23.944031)
+    p.Position = Vector3.new(367.006378, 3.861910, -854.351624)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(6.000000, 12.941358, 24.030884)
+    p.Position = Vector3.new(376.000000, 3.470679, -854.359070)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(6.000000, 12.168727, 24.125977)
+    p.Position = Vector3.new(380.000000, 3.084363, -854.418396)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(4.660156, 11.123481, 24.208435)
+    p.Position = Vector3.new(385.330078, 2.561740, -854.449951)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(3.346954, 24.552666, 24.455444)
+    p.Position = Vector3.new(333.756653, 9.276333, -854.208679)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(6.000000, 6.000000, 3.934265)
+    p.Position = Vector3.new(388.000000, 0.000000, -864.203369)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(5.709045, 10.401782, 24.064270)
+    p.Position = Vector3.new(346.145508, 2.200891, -854.308167)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(4.031647, 12.827452, 23.894897)
+    p.Position = Vector3.new(350.984192, 3.413726, -854.300903)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(3.702118, 33.243935, 24.428345)
+    p.Position = Vector3.new(328.532104, 13.621967, -854.121216)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(6.056580, 16.098476, 24.371155)
+    p.Position = Vector3.new(337.971710, 5.049238, -854.284058)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(4.541199, 14.142370, 24.172791)
+    p.Position = Vector3.new(341.270599, 4.071185, -854.350464)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(4.535492, 21.660177, 24.547363)
+    p.Position = Vector3.new(335.267761, 7.830089, -854.176270)
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Anchored = true
+    p.Size = Vector3.new(1.859558, 29.374466, 24.482788)
+    p.Position = Vector3.new(331.170074, 11.687233, -854.112061)
+    p.Parent = pasta
+end
+        else
+
+            task.spawn(function()
+                local objetos = {}
+
+                for _, objeto in ipairs(workspace:GetDescendants()) do
+                    if objeto.Name == "ParteSalvaDoJosue" then
+                        table.insert(objetos, objeto)
+                    end
+                end
+
+                local count = 0
+
+                for i, objeto in ipairs(objetos) do
+                    if objeto and objeto.Parent then
+                        objeto:Destroy()
+                        count = count + 1
+                    end
+
+                    if i % 50 == 0 then
+                        task.wait()
+                    end
+                end
+
+                            end)
+
+        end
+    end,
+    "Cria blocos para passar dos parkours facilmente"
+)
+    local toggle2Frame, setToggle2State = createToggleButton(
+        "🧱 Criar Blocos(2)",
+        function(state)
+            toggle2Active = state
+            if state then
+
+local pasta = Instance.new("Folder")
+pasta.Name = "PartesSalvasDoJosue"
+pasta.Parent = workspace
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(6.000000, 10.753159, 13.683167)
+    p.Position = Vector3.new(382.000000, 2.376579, -897.866821)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(7.319946, 17.645557, 8.405823)
+    p.Position = Vector3.new(371.837280, 5.822779, -856.797119)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(56.543549, 6.356651, 16.865234)
+    p.Position = Vector3.new(215.271759, 50.178329, -897.708740)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(43.320312, 6.705446, 12.065430)
+    p.Position = Vector3.new(178.237366, 10.352723, -856.967285)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(25.342392, 6.243042, 16.403442)
+    p.Position = Vector3.new(174.584595, 50.121521, -897.773682)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(17.076508, 6.132509, 6.000000)
+    p.Position = Vector3.new(241.538254, 10.066255, -856.000000)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(4.570007, 12.316643, 13.855347)
+    p.Position = Vector3.new(377.341858, 3.158321, -897.739075)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(4.254883, 7.886914, 13.740417)
+    p.Position = Vector3.new(393.127441, 0.943457, -897.870239)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(3.282166, 8.017548, 11.688171)
+    p.Position = Vector3.new(392.428711, 1.008774, -855.847290)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(36.663986, 1.644348, 18.501465)
+    p.Position = Vector3.new(218.068573, 12.553243, -855.382935)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(50.153046, 4.456115, 11.356812)
+    p.Position = Vector3.new(313.436981, 9.228058, -897.722534)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(6.000000, 7.990837, 13.707336)
+    p.Position = Vector3.new(388.000000, 0.995419, -897.853638)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(4.229828, 14.605953, 13.669861)
+    p.Position = Vector3.new(373.139252, 4.302977, -897.478455)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(28.934235, 14.482620, 13.621094)
+    p.Position = Vector3.new(356.532898, 4.241310, -897.469482)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(5.554718, 10.421762, 9.096375)
+    p.Position = Vector3.new(388.222656, 2.210881, -856.451843)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(6.065826, 12.238853, 9.391846)
+    p.Position = Vector3.new(383.562683, 3.119426, -856.304077)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(6.946991, 15.865870, 8.550781)
+    p.Position = Vector3.new(377.255066, 4.932935, -856.724609)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(6.234222, 19.137760, 8.935303)
+    p.Position = Vector3.new(365.296143, 6.568880, -856.993774)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(7.441010, 20.475502, 9.209167)
+    p.Position = Vector3.new(359.538025, 7.237751, -856.683716)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(6.832306, 22.314676, 9.356323)
+    p.Position = Vector3.new(352.506348, 8.157338, -856.511597)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(7.340851, 23.434166, 10.526428)
+    p.Position = Vector3.new(345.538788, 8.717083, -856.133301)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+
+do
+    local p = Instance.new("Part")
+    p.Name = "ParteSalvaDoJosue"
+    p.Color = Color3.fromRGB(13, 105, 172)
+    p.Material = Enum.Material.SmoothPlastic
+    p.Size = Vector3.new(48.943207, 24.508476, 14.316284)
+    p.Position = Vector3.new(317.637054, 9.254238, -855.994690)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = true
+    p.CanQuery = true
+    p.Transparency = 0.000000
+    p.Reflectance = 0.000000
+    p.Orientation = Vector3.new(-0.000000, 0.000000, 0.000000)
+    p.Shape = Enum.PartType.Block
+    p.Parent = pasta
+end
+        else
+
+            task.spawn(function()
+                local objetos = {}
+
+                for _, objeto in ipairs(workspace:GetDescendants()) do
+                    if objeto.Name == "ParteSalvaDoJosue" then
+                        table.insert(objetos, objeto)
+                    end
+                end
+
+                local count = 0
+
+                for i, objeto in ipairs(objetos) do
+                    if objeto and objeto.Parent then
+                        objeto:Destroy()
+                        count = count + 1
+                    end
+
+                    if i % 50 == 0 then
+                        task.wait()
+                    end
+                end
+
+                            end)
+
+        end
+    end,
+    "Cria blocos para passar dos parkours facilmente"
+)
+
+    local toggle2Frame, setToggle2State = createToggleButton(
+        "🧱 Criar Blocos(3)",
+        function(state)
+            toggle2Active = state
+            if state then
+
+local partes = {}
+
+partes[1] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(248.45457458496094, 4.72274112701416, -893.9808349609375, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(10.595550537109375, 13.342866897583008, 27.75750732421875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(248.45457458496094, 4.72274112701416, -893.9808349609375),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[2] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(236.42434692382812, 16.344017028808594, -851.4158935546875, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(14.55731201171875, 3.533580780029297, 23.4942626953125),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(236.42434692382812, 16.344017028808594, -851.4158935546875),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[3] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(235.67018127441406, 11.704607963562012, -894.8701171875, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(16.427825927734375, 35.96102523803711, 23.91845703125),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(235.67018127441406, 11.704607963562012, -894.8701171875),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[4] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(183.44125366210938, 35.20087432861328, -894.5062255859375, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(9.405242919921875, 4.401752471923828, 20.169677734375),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(183.44125366210938, 35.20087432861328, -894.5062255859375),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[5] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(188.8311309814453, 14.492681503295898, -894.3095703125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(42.542327880859375, 34.9853630065918, 19.23553466796875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(188.8311309814453, 14.492681503295898, -894.3095703125),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[6] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(204.94775390625, 35.233131408691406, -893.9326171875, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(11.670547485351562, 4.466266632080078, 21.05841064453125),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(204.94775390625, 35.233131408691406, -893.9326171875),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[7] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(226.34445190429688, 28.54438018798828, -852.7274169921875, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6.6889190673828125, 7.0887603759765625, 15.45477294921875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(226.34445190429688, 28.54438018798828, -852.7274169921875),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[8] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(172.40887451171875, 27.542076110839844, -851.5100708007812, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(36.7235107421875, 0.7582340240478516, 23.17449951171875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(172.40887451171875, 27.542076110839844, -851.5100708007812),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[9] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(195.8380126953125, 31.186105728149414, -852.718017578125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6.323974609375, 1.9360237121582031, 21.00189208984375),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(195.8380126953125, 31.186105728149414, -852.718017578125),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[10] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(202.70291137695312, 23.532075881958008, -853.4213256835938, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(7.4058380126953125, 5.064151763916016, 15.9168701171875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(202.70291137695312, 23.532075881958008, -853.4213256835938),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[11] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(210.11952209472656, 29.55370330810547, -852.5169677734375, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(5.760955810546875, 5.1074066162109375, 15.03387451171875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(210.11952209472656, 29.55370330810547, -852.5169677734375),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[12] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(218, 22.550518035888672, -853.2197265625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 7.101036071777344, 14.52587890625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(218, 22.550518035888672, -853.2197265625),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[13] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(390, -0.5428509712219238, -852.8823852539062, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 4.914298057556152, 25.2242431640625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(390, -0.5428509712219238, -852.8823852539062),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[14] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(384.4781494140625, 1.9599003791809082, -852.7515869140625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6.956298828125, 9.919800758361816, 25.875244140625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(384.4781494140625, 1.9599003791809082, -852.7515869140625),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[15] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(378, 4.452263832092285, -852.336181640625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 14.90452766418457, 27.28631591796875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(378, 4.452263832092285, -852.336181640625),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[16] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(363.8432922363281, 6.946530342102051, -852.2154541015625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(23.452606201171875, 19.8930606842041, 27.956787109375),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(363.8432922363281, 6.946530342102051, -852.2154541015625),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[17] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(335.4305114746094, 12.924176216125488, -851.072265625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(31.919525146484375, 7.848352432250977, 25.8121337890625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(335.4305114746094, 12.924176216125488, -851.072265625),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[18] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(319.9825439453125, 25.26519203186035, -851.4478759765625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(1.691436767578125, 24.530385971069336, 27.57025146484375),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(319.9825439453125, 25.26519203186035, -851.4478759765625),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[19] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(307.1813049316406, 35.26551055908203, -851.6427001953125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(24.36260986328125, 4.531017303466797, 24.230712890625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(307.1813049316406, 35.26551055908203, -851.6427001953125),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[20] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(370.7093811035156, 1.5551767349243164, -894.6058349609375, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(40.58123779296875, 9.110353469848633, 19.211669921875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(370.7093811035156, 1.5551767349243164, -894.6058349609375),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[21] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(380.92510986328125, 5.661881923675537, -895.0517578125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(7.8502197265625, 5.323763847351074, 19.33563232421875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(380.92510986328125, 5.661881923675537, -895.0517578125),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[22] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(372.2077331542969, 8.855386734008789, -894.2728881835938, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(10.41546630859375, 3.710773468017578, 20.0260009765625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(372.2077331542969, 8.855386734008789, -894.2728881835938),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[23] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(362.16766357421875, 8.124263763427734, -894.5590209960938, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(10.3353271484375, 10.60745620727539, 19.46575927734375),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(362.16766357421875, 8.124263763427734, -894.5590209960938),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[24] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(352.9749755859375, 7.084599494934082, -894.8226318359375, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(8.273834228515625, 18.091215133666992, 20.34100341796875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(352.9749755859375, 7.084599494934082, -894.8226318359375),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[25] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(330.01513671875, 14.365900039672852, -894.7640380859375, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(38.00433349609375, 6.731800079345703, 22.802001953125),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(330.01513671875, 14.365900039672852, -894.7640380859375),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[26] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(306.2684326171875, 9.289281845092773, -894.6576538085938, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(10.536865234375, 8.57856273651123, 22.90447998046875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(306.2684326171875, 9.289281845092773, -894.6576538085938),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[27] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(297.1846923828125, 7.5894622802734375, -894.7471923828125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(8.369354248046875, 21.995635986328125, 20.89459228515625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(297.1846923828125, 7.5894622802734375, -894.7471923828125),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[28] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(291.02947998046875, 5.934295654296875, -894.530029296875, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(5.325164794921875, 15.043991088867188, 21.189453125),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(291.02947998046875, 5.934295654296875, -894.530029296875),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+local function criarPartes()
+	local pastaPartes = Instance.new("Folder")
+	pastaPartes.Name = "PartesCriadas"
+	pastaPartes.Parent = workspace
+
+	local contador = 0
+
+	for i, dados in ipairs(partes) do
+
+		local parte = Instance.new("Part")
+
+		for propriedade, valor in pairs(dados) do
+
+			if propriedade ~= "ClassName" and propriedade ~= "Position" then
+				pcall(function()
+					parte[propriedade] = valor
+				end)
+			end
+		end
+
+		parte.Anchored = true
+
+		if dados.CFrame then
+			parte.CFrame = dados.CFrame
+		elseif dados.Position then
+			parte.Position = dados.Position
+		end
+
+		parte.Parent = pastaPartes
+		contador = contador + 1
+	end
+
+		return contador
+end
+
+local total = criarPartes()
+        else
+
+            task.spawn(function()
+                local objetos = {}
+
+                for _, objeto in ipairs(workspace:GetDescendants()) do
+                    if objeto.Name == "ParteSalvaDoJosue" then
+                        table.insert(objetos, objeto)
+                    end
+                end
+
+                local count = 0
+
+                for i, objeto in ipairs(objetos) do
+                    if objeto and objeto.Parent then
+                        objeto:Destroy()
+                        count = count + 1
+                    end
+
+                    if i % 50 == 0 then
+                        task.wait()
+                    end
+                end
+
+                            end)
+
+        end
+    end,
+    "Cria blocos para passar dos parkours facilmente"
+)
+
+    local toggle2Frame, setToggle2State = createToggleButton(
+        "🧱 Criar Blocos(4)",
+        function(state)
+            toggle2Active = state
+            if state then
+
+local partes = {}
+
+partes[1] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(183.63465881347656, 7.540810585021973, -854.564697265625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(9.269317626953125, 21.081621170043945, 26.0809326171875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(183.63465881347656, 7.540810585021973, -854.564697265625),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[2] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(222.04196166992188, 8.669401168823242, -854.325439453125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(10.611465454101562, 5.9794416427612305, 23.45208740234375),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(222.04196166992188, 8.669401168823242, -854.325439453125),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[3] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(152.75729370117188, 1.722132682800293, -854.9224853515625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(5.85723876953125, 9.444265365600586, 26.4189453125),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(152.75729370117188, 1.722132682800293, -854.9224853515625),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[4] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(150.92446899414062, 11.95781421661377, -888.24267578125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(4.1510467529296875, 29.91562843322754, 10.78271484375),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(150.92446899414062, 11.95781421661377, -888.24267578125),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[5] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(157.6009063720703, 4.819260597229004, -854.8839111328125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(5.2018280029296875, 15.638521194458008, 26.739501953125),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(157.6009063720703, 4.819260597229004, -854.8839111328125),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[6] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(162, 7.7846221923828125, -854.93310546875, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 21.569244384765625, 26.84765625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(162, 7.7846221923828125, -854.93310546875),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[7] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(173.08538818359375, 10.80545711517334, -854.22216796875, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(16.170761108398438, 27.61091423034668, 25.55572509765625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(173.08538818359375, 10.80545711517334, -854.22216796875),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[8] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(192, 4.7852396965026855, -854.4431762695312, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 15.570479393005371, 25.51019287109375),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(192, 4.7852396965026855, -854.4431762695312),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[9] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(196, 1.5272293090820312, -854.4611206054688, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 9.054458618164062, 26.29864501953125),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(196, 1.5272293090820312, -854.4611206054688),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[10] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(218.27781677246094, 1.6014580726623535, -854.3036499023438, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(39.514923095703125, 9.202916145324707, 21.62347412109375),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(218.27781677246094, 1.6014580726623535, -854.3036499023438),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[11] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(215.41989135742188, 7.274819374084473, -854.4246215820312, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(4.3771820068359375, 4.549638748168945, 22.48748779296875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(215.41989135742188, 7.274819374084473, -854.4246215820312),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[12] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(216.7974395751953, 8.784889221191406, -854.4132080078125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(4.405120849609375, 3.5697784423828125, 22.84283447265625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(216.7974395751953, 8.784889221191406, -854.4132080078125),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[13] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(241.43792724609375, 1.8621835708618164, -854.21044921875, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6.9568328857421875, 9.724367141723633, 21.9559326171875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(241.43792724609375, 1.8621835708618164, -854.21044921875),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[14] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(222.14712524414062, 11.499791145324707, -854.2510986328125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(3.0138702392578125, 4.999582290649414, 23.71307373046875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(222.14712524414062, 11.499791145324707, -854.2510986328125),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[15] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(229.00433349609375, 7.248691082000732, -854.335693359375, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(4.614501953125, 4.497382164001465, 22.07867431640625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(229.00433349609375, 7.248691082000732, -854.335693359375),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[16] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(248, 6.1785888671875, -854.4439697265625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 18.357177734375, 22.93927001953125),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(248, 6.1785888671875, -854.4439697265625),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[17] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(254, 10.501897811889648, -853.8892822265625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 27.003795623779297, 22.677001953125),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(254, 10.501897811889648, -853.8892822265625),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[18] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(171.540771484375, 26.940568923950195, -896.345703125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(40.04998779296875, 0.2945518493652344, 26.853271484375),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(171.540771484375, 26.940568923950195, -896.345703125),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[19] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(150.93197631835938, 12.066946029663086, -905.0533447265625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(4.13604736328125, 30.133892059326172, 10.17791748046875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(150.93197631835938, 12.066946029663086, -905.0533447265625),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[20] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(154.08694458007812, 12.040421485900879, -897.114501953125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(5.8261260986328125, 30.080842971801758, 7.77099609375),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(154.08694458007812, 12.040421485900879, -897.114501953125),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[21] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(211.19183349609375, 19.931529998779297, -896.190185546875, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(44.551666259765625, 5.863058090209961, 25.61962890625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(211.19183349609375, 19.931529998779297, -896.190185546875),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[22] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(237.7637939453125, 6.732948303222656, -897.1919555664062, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(9.527603149414062, 19.465896606445312, 22.2322998046875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(237.7637939453125, 6.732948303222656, -897.1919555664062),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[23] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(246.60797119140625, 1.9330601692199707, -896.8125610351562, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(12.7840576171875, 9.866120338439941, 19.6959228515625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(246.60797119140625, 1.9330601692199707, -896.8125610351562),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[24] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(291.8563537597656, 9.163614273071289, -897.0421142578125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(12.700592041015625, 1.4508428573608398, 24.4488525390625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(291.8563537597656, 9.163614273071289, -897.0421142578125),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[25] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(372.8233642578125, 6.6556878089904785, -897.6932373046875, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(14.771575927734375, 1.670823097229004, 21.49755859375),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(372.8233642578125, 6.6556878089904785, -897.6932373046875),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[26] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(354, 1.5210456848144531, -908, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 9.042091369628906, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(354, 1.5210456848144531, -908),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[27] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(354, 1.0226526260375977, -902, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 8.045305252075195, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(354, 1.0226526260375977, -902),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[28] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(354, 0.6491503715515137, -898, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 7.298300743103027, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(354, 0.6491503715515137, -898),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[29] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(354, 0.3739781379699707, -894, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 6.747956275939941, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(354, 0.3739781379699707, -894),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[30] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(354, -0.13328981399536133, -888, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 5.733420372009277, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(354, -0.13328981399536133, -888),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[31] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(348, 3.7705116271972656, -888, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 13.541023254394531, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(348, 3.7705116271972656, -888),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[32] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(348, 3.3741230964660645, -894, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 12.748246192932129, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(348, 3.3741230964660645, -894),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[33] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(348, 2.6458277702331543, -900, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 11.291655540466309, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(348, 2.6458277702331543, -900),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[34] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(348, 2.2828187942504883, -906, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 10.565637588500977, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(348, 2.2828187942504883, -906),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[35] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(340, 7.017971992492676, -910, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 20.03594398498535, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(340, 7.017971992492676, -910),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[36] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(340, 7.357089996337891, -904, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 20.71417999267578, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(340, 7.357089996337891, -904),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[37] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(340, 7.961953163146973, -898, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 21.923906326293945, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(340, 7.961953163146973, -898),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[38] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(340, 8.518970489501953, -892, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 23.037940979003906, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(340, 8.518970489501953, -892),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[39] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(340, 9.053427696228027, -886, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 24.106855392456055, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(340, 9.053427696228027, -886),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[40] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(333.1391906738281, 10.865769386291504, -898.010498046875, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(8.27838134765625, 27.731538772583008, 30.39166259765625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(333.1391906738281, 10.865769386291504, -898.010498046875),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[41] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(343.81988525390625, 6.383235931396484, -910, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(2.3602294921875, 18.76647186279297, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(343.81988525390625, 6.383235931396484, -910),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[42] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(343.8699951171875, 6.143161773681641, -904, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(2.259979248046875, 18.28632354736328, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(343.8699951171875, 6.143161773681641, -904),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[43] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(342, 5.684675216674805, -898, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 17.36935043334961, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(342, 5.684675216674805, -898),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[44] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(342, 5.283381462097168, -894, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 16.566762924194336, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(342, 5.283381462097168, -894),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[45] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(342, 5.004755973815918, -890, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 16.009511947631836, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(342, 5.004755973815918, -890),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[46] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(344, 5.317534446716309, -886, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 12.635068893432617, 6),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(344, 5.317534446716309, -886),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[47] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(325.03271484375, 10.247360229492188, -897.0234375, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(10.2049560546875, 26.494720458984375, 28.49188232421875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(325.03271484375, 10.247360229492188, -897.0234375),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[48] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(315.47479248046875, 5.010342121124268, -897.6058349609375, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(8.949615478515625, 16.02068328857422, 29.75946044921875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(315.47479248046875, 5.010342121124268, -897.6058349609375),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[49] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(306.22705078125, 2.6500964164733887, -897.54296875, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(10.4541015625, 11.300192832946777, 29.19500732421875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(306.22705078125, 2.6500964164733887, -897.54296875),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[50] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(338.89111328125, 9.121038436889648, -855.4205322265625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(8.881927490234375, 4.242076873779297, 17.48291015625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(338.89111328125, 9.121038436889648, -855.4205322265625),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[51] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(374.43463134765625, 1.7001066207885742, -854.6995239257812, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(35.796539306640625, 9.400213241577148, 29.67919921875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(374.43463134765625, 1.7001066207885742, -854.6995239257812),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[52] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(351.57757568359375, 9.044296264648438, -855.1087036132812, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(11.257720947265625, 4.088591575622559, 12.11932373046875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(351.57757568359375, 9.044296264648438, -855.1087036132812),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[53] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(345.41357421875, 13.623639106750488, -855.73193359375, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(4.924346923828125, 7.169912338256836, 18.53607177734375),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(345.41357421875, 13.623639106750488, -855.73193359375),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[54] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(331.30145263671875, 13.605897903442383, -855.89892578125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6.7745361328125, 7.277132987976074, 17.79779052734375),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(331.30145263671875, 13.605897903442383, -855.89892578125),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[55] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(309.84381103515625, 9.205768585205078, -854.9833984375, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(30.312347412109375, 4.411538124084473, 22.44293212890625),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(309.84381103515625, 9.205768585205078, -854.9833984375),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[56] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(292, 11.036005020141602, -855.0924072265625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(6, 8.62949275970459, 22.46856689453125),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(292, 11.036005020141602, -855.0924072265625),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+partes[57] = {
+	Reflectance = 0,
+	Color = Color3.fromRGB(13, 105, 172),
+	CFrame = CFrame.new(312.9635009765625, 13.08716869354248, -854.9430541992188, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	Material = Enum.Material.SmoothPlastic,
+	Size = Vector3.new(4.9869384765625, 4.174337387084961, 22.42791748046875),
+	BottomSurface = Enum.SurfaceType.Inlet,
+	CanCollide = true,
+	CanTouch = true,
+	Position = Vector3.new(312.9635009765625, 13.08716869354248, -854.9430541992188),
+	BrickColor = BrickColor.new("Bright blue"),
+	Transparency = 0,
+	Name = "ParteSalvaDoJosue",
+	ClassName = "Part",
+	Anchored = true,
+	CanQuery = true,
+	CastShadow = true,
+	TopSurface = Enum.SurfaceType.Studs,
+}
+
+local function criarPartes()
+    local pasta = Instance.new("Folder")
+    pasta.Name = "PartesConstrucao"
+    pasta.Parent = workspace
+
+    for i, dados in ipairs(partes) do
+        local parte = Instance.new("Part")
+
+        parte.Reflectance = dados.Reflectance
+        parte.Color = dados.Color
+        parte.CFrame = dados.CFrame
+        parte.Material = dados.Material
+        parte.Size = dados.Size
+        parte.BottomSurface = dados.BottomSurface
+        parte.CanCollide = dados.CanCollide
+        parte.CanTouch = dados.CanTouch
+        parte.BrickColor = dados.BrickColor
+        parte.Transparency = dados.Transparency
+        parte.Name = dados.Name
+        parte.Anchored = dados.Anchored
+        parte.TopSurface = dados.TopSurface
+
+        parte.Parent = pasta
+
+        if i % 10 == 0 then
+                    end
+    end
+
+    end
+
+criarPartes()
+        else
+
+            task.spawn(function()
+                local objetos = {}
+
+                for _, objeto in ipairs(workspace:GetDescendants()) do
+                    if objeto.Name == "ParteSalvaDoJosue" then
+                        table.insert(objetos, objeto)
+                    end
+                end
+
+                local count = 0
+
+                for i, objeto in ipairs(objetos) do
+                    if objeto and objeto.Parent then
+                        objeto:Destroy()
+                        count = count + 1
+                    end
+
+                    if i % 50 == 0 then
+                        task.wait()
+                    end
+                end
+
+                            end)
+
+        end
+    end,
+    "Cria blocos para passar dos parkours facilmente"
+)
+local toggle6Frame, setToggle6State = createToggleButton(
+    "Recrutamento Block🧱",
+    function(state)
+        local function criarPartes()
+            local partes = {}
+
+            partes[1] = {
+                Reflectance = 0,
+                Color = Color3.fromRGB(13, 105, 172),
+                CFrame = CFrame.new(277.5145263671875, 0.8150553703308105, -627.0250244140625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+                Material = Enum.Material.SmoothPlastic,
+                Size = Vector3.new(18.970977783203125, 7.630110740661621, 37.36224365234375),
+                BottomSurface = Enum.SurfaceType.Inlet,
+                CanCollide = true,
+                CanTouch = true,
+                Position = Vector3.new(277.5145263671875, 0.8150553703308105, -627.0250244140625),
+                BrickColor = BrickColor.new("Bright blue"),
+                Transparency = 0,
+                Name = "ParteSalvaDoJosue",
+                ClassName = "Part",
+                Anchored = true,
+                CanQuery = true,
+                CastShadow = true,
+                TopSurface = Enum.SurfaceType.Studs,
+            }
+
+            partes[2] = {
+                Reflectance = 0,
+                Color = Color3.fromRGB(13, 105, 172),
+                CFrame = CFrame.new(277.3233642578125, 0.6122264862060547, -653.9039306640625, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+                Material = Enum.Material.SmoothPlastic,
+                Size = Vector3.new(18.527252197265625, 7.224452972412109, 17.009521484375),
+                BottomSurface = Enum.SurfaceType.Inlet,
+                CanCollide = true,
+                CanTouch = true,
+                Position = Vector3.new(277.3233642578125, 0.6122264862060547, -653.9039306640625),
+                BrickColor = BrickColor.new("Bright blue"),
+                Transparency = 0,
+                Name = "ParteSalvaDoJosue",
+                ClassName = "Part",
+                Anchored = true,
+                CanQuery = true,
+                CastShadow = true,
+                TopSurface = Enum.SurfaceType.Studs,
+            }
+
+            partes[3] = {
+                Reflectance = 0,
+                Color = Color3.fromRGB(13, 105, 172),
+                CFrame = CFrame.new(277.51556396484375, 2.30800199508667, -582.1007080078125, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+                Material = Enum.Material.SmoothPlastic,
+                Size = Vector3.new(18.997222900390625, 10.61600399017334, 54.6566162109375),
+                BottomSurface = Enum.SurfaceType.Inlet,
+                CanCollide = true,
+                CanTouch = true,
+                Position = Vector3.new(277.51556396484375, 2.30800199508667, -582.1007080078125),
+                BrickColor = BrickColor.new("Bright blue"),
+                Transparency = 0,
+                Name = "ParteSalvaDoJosue",
+                ClassName = "Part",
+                Anchored = true,
+                CanQuery = true,
+                CastShadow = true,
+                TopSurface = Enum.SurfaceType.Studs,
+            }
+
+            partes[4] = {
+                Reflectance = 0,
+                Color = Color3.fromRGB(13, 105, 172),
+                CFrame = CFrame.new(256.0576171875, 2.297849178314209, -558.609130859375, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+                Material = Enum.Material.SmoothPlastic,
+                Size = Vector3.new(48.865509033203125, 10.595698356628418, 17.0986328125),
+                BottomSurface = Enum.SurfaceType.Inlet,
+                CanCollide = true,
+                CanTouch = true,
+                Position = Vector3.new(256.0576171875, 2.297849178314209, -558.609130859375),
+                BrickColor = BrickColor.new("Bright blue"),
+                Transparency = 0,
+                Name = "ParteSalvaDoJosue",
+                ClassName = "Part",
+                Anchored = true,
+                CanQuery = true,
+                CastShadow = true,
+                TopSurface = Enum.SurfaceType.Studs,
+            }
+
+            partes[5] = {
+                Reflectance = 0,
+                Color = Color3.fromRGB(13, 105, 172),
+                CFrame = CFrame.new(239.08197021484375, 2.3079214096069336, -585.8911743164062, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+                Material = Enum.Material.SmoothPlastic,
+                Size = Vector3.new(15.131576538085938, 10.615842819213867, 44.4261474609375),
+                BottomSurface = Enum.SurfaceType.Inlet,
+                CanCollide = true,
+                CanTouch = true,
+                Position = Vector3.new(239.08197021484375, 2.3079214096069336, -585.8911743164062),
+                BrickColor = BrickColor.new("Bright blue"),
+                Transparency = 0,
+                Name = "ParteSalvaDoJosue",
+                ClassName = "Part",
+                Anchored = true,
+                CanQuery = true,
+                CastShadow = true,
+                TopSurface = Enum.SurfaceType.Studs,
+            }
+
+            local partidasCriadas = 0
+            local pastaPartes = Instance.new("Folder")
+            pastaPartes.Name = "PartesRecuperadas"
+            pastaPartes.Parent = workspace
+
+            for i, dados in ipairs(partes) do
+                local parte = Instance.new("Part")
+
+                for propriedade, valor in pairs(dados) do
+                    if propriedade ~= "ClassName" and propriedade ~= "Position" then
+                        pcall(function()
+                            parte[propriedade] = valor
+                        end)
+                    end
+                end
+
+                parte.Parent = pastaPartes
+                partidasCriadas = partidasCriadas + 1
+            end
+        end
+
+        if state then
+            pcall(criarPartes)
+        else
+            local pasta = workspace:FindFirstChild("PartesRecuperadas")
+            if pasta then
+                for _, parte in ipairs(pasta:GetChildren()) do
+                    if parte.Name == "ParteSalvaDoJosue" then
+                        parte:Destroy()
+                    end
+                end
+                if #pasta:GetChildren() == 0 then
+                    pasta:Destroy()
+                end
+            end
+            
+            local todasPartes = workspace:GetDescendants()
+            for _, parte in ipairs(todasPartes) do
+                if parte.Name == "ParteSalvaDoJosue" and parte:IsA("BasePart") then
+                    parte:Destroy()
+                end
+            end
+        end
+    end,
+    "Cria blocos para passar dos parkours facilmente para recrutamento."
+)
+    local toggle3Frame, setToggle3State = createToggleButton(
+        "⬇️ Underground",
+        function(state)
+            toggle3Active = state
+            if undergroundFunction then
+                undergroundFunction(state)
+            end
+        end,
+        "Teleporta o jogador para baixo do mapa"
+    )
+
+    local toggle4Frame, setToggle4State = createToggleButton(
+        "⚡ ProximityPrompt Insta",
+        function(state)
+            toggle4Active = state
+            if proximityPromptFunction then
+                proximityPromptFunction(state)
+            end
+        end,
+        "Ativa prompts instantaneamente (sem segurar)"
+    )
+
+local TextChatService = game:GetService("TextChatService")
+
+local hinoRunning = false
+local toggle5Active = false
+
+local function enviarMensagem(texto)
+    local chatChannel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+
+    if not chatChannel then
+                return false
+    end
+
+    local sucesso, erro = pcall(function()
+        chatChannel:SendAsync(texto)
+    end)
+
+    if not sucesso then
+                return false
+    end
+
+    return true
+end
+
+local function enviarHino()
+
+    if hinoRunning then
+        return
+    end
+
+    hinoRunning = true
+
+    local hino = {
+
+        "Ouviram do Ipiranga as margens plácidas",
+        "De um povo heroico o brado retumbante",
+        "E o sol da liberdade, em raios fúlgidos",
+        "Brilhou no céu da pátria nesse instante",
+
+        "Se o penhor dessa igualdade",
+        "Conseguimos conquistar com braço forte",
+        "Em teu seio, ó liberdade",
+        "Desafia o nosso peito a própria morte",
+
+        "Ó Pátria amada",
+        "Idolatrada",
+        "Salve! Salve!",
+
+        "Brasil, um sonho intenso, um raio vívido",
+        "De amor e de esperança à terra desce",
+        "Se em teu formoso céu, risonho e límpido",
+        "A imagem do Cruzeiro resplandece",
+
+        "Gigante pela própria natureza",
+        "És belo, és forte, impávido colosso",
+        "E o teu futuro espelha essa grandeza",
+
+        "Terra adorada",
+        "Entre outras mil",
+        "És tu, Brasil",
+        "Ó Pátria amada",
+
+        "Dos filhos deste solo és mãe gentil",
+        "Pátria amada, Brasil!",
+
+        "Deitado eternamente em berço esplêndido",
+        "Ao som do mar e à luz do céu profundo",
+        "Fulguras, ó Brasil, florão da América",
+        "Iluminado ao sol do Novo Mundo",
+
+        "Do que a terra, mais garrida",
+        "Teus risonhos, lindos campos têm mais flores",
+        "Nossos bosques têm mais vida",
+        "Nossa vida, no teu seio, mais amores",
+
+        "Ó Pátria amada",
+        "Idolatrada",
+        "Salve! Salve!",
+
+        "Brasil, de amor eterno seja símbolo",
+        "O lábaro que ostentas estrelado",
+        "E diga o verde-louro dessa flâmula",
+        "Paz no futuro e glória no passado",
+
+        "Mas, se ergues da justiça a clava forte",
+        "Verás que um filho teu não foge à luta",
+        "Nem teme, quem te adora, a própria morte",
+
+        "Terra adorada",
+        "Entre outras mil",
+        "És tu, Brasil",
+        "Ó Pátria amada",
+
+        "Dos filhos deste solo és mãe gentil",
+        "Pátria amada, Brasil!"
+    }
+
+    for _, linha in ipairs(hino) do
+
+        if not hinoRunning or not toggle5Active then
+            break
+        end
+
+        enviarMensagem(linha)
+
+        task.wait(5)
+
+        if not hinoRunning or not toggle5Active then
+            break
+        end
+    end
+
+    hinoRunning = false
+end
+    
+        local toggle6Frame, setToggle6State = createToggleButton(
+        "Ser Recruta novamente.",
+        function(state)
+    game.ReplicatedStorage.Remotes.AutomatedRecruitment:FireServer()
+        end,
+        "Não remove sua patente, só te torna recruta temporáriamente."
+    )
+    local function setupDragging()
+        local dragging = false
+        local dragInput = nil
+        local dragStart = nil
+        local startPos = nil
+
+        local function updatePosition(input)
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+
+        titleBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                dragStart = input.Position
+                startPos = mainFrame.Position
+
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
+            end
+        end)
+
+        titleBar.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                dragInput = input
+            end
+        end)
+
+        UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                updatePosition(input)
+            end
+        end)
+    end
+
+    setupDragging()
+
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+
+        if input.KeyCode == Enum.KeyCode.T then
+            if not mainFrame.Visible then
+                mainFrame.Visible = true
+                isMinimized = false
+            else
+                mainFrame.Visible = false
+                isMinimized = true
+            end
+        end
+    end)
+
+    closeButton.MouseButton1Click:Connect(function()
+
+        pathfindingFunction(false)
+
+        toggle5Active = false
+        hinoRunning = false
+        screenGui:Destroy()
+    end)
+
+    minimizeButton.MouseButton1Click:Connect(function()
+        if mainFrame.Visible then
+            mainFrame.Visible = false
+            isMinimized = true
+        end
+    end)
+
+    return screenGui
+end
+
+local gui = createMainGUI()
+workspace.Map.Zonas.PrisonZone.Part.Size = Vector3.new(500000, 500000, 500000)
+
+-- Anti Cheat
+local player = game.Players.LocalPlayer
+local serverScripts = player.PlayerScripts:FindFirstChild("Server")
+
+if serverScripts then
+    local keepScripts = {"Beams", "Device", "HD logger", "Icons", "KnitSystem"}
+    
+    local function isRandomName(name)
+        if #name < 5 or #name > 15 then
+            return false
+        end
+        
+        local hasUpper = false
+        local hasLower = false
+        
+        for i = 1, #name do
+            local char = string.sub(name, i, i)
+            if char == string.upper(char) and char ~= string.lower(char) then
+                hasUpper = true
+            elseif char == string.lower(char) and char ~= string.upper(char) then
+                hasLower = true
+            end
+        end
+        
+        return hasUpper and hasLower
+    end
+    
+    for _, child in ipairs(serverScripts:GetChildren()) do
+        if child:IsA("Script") or child:IsA("LocalScript") then
+            local source = child.Source or ""
+            if string.find(source, "getRandomString") or string.find(source, "Random%.new%(") then
+                print("Deletando script gerador: " .. child.Name)
+                child:Destroy()
+            end
+        end
+    end
+    
+    for _, child in ipairs(serverScripts:GetChildren()) do
+        local shouldKeep = false
+        
+        for _, keepName in ipairs(keepScripts) do
+            if child.Name == keepName then
+                shouldKeep = true
+                break
+            end
+        end
+        
+        if not shouldKeep and isRandomName(child.Name) then
+            print("Deletando script com nome aleatório: " .. child.Name)
+            child:Destroy()
+        end
+    end
+end
+-- Anti Cheat texto
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+
+local AntiCheatMessage = Instance.new("ScreenGui")
+AntiCheatMessage.Name = "AntiCheatMessage"
+AntiCheatMessage.ResetOnSpawn = false
+AntiCheatMessage.Parent = player:WaitForChild("PlayerGui")
+
+local text = Instance.new("TextLabel")
+text.Size = UDim2.new(1, 0, 0, 40)
+text.Position = UDim2.new(0, 0, 1, -140)
+text.BackgroundTransparency = 1
+text.Text = "Anti-cheat desativado!"
+text.TextColor3 = Color3.fromRGB(255, 255, 255)
+text.TextSize = 70
+text.Font = Enum.Font.GothamBold
+text.TextStrokeTransparency = 0.5
+text.Parent = AntiCheatMessage
+
+text.Transparency = 1
+text.BackgroundTransparency = 1
+task.wait(1)
+text.BackgroundTransparency = 1
+text.Transparency = 0.8
+text.BackgroundTransparency = 1
+task.wait(0.1)
+text.Transparency = 0.6
+text.BackgroundTransparency = 1
+task.wait(0.1)
+text.Transparency = 0.4
+text.BackgroundTransparency = 1
+task.wait(0.1)
+text.Transparency = 0.2
+text.BackgroundTransparency = 1
+task.wait(0.1)
+text.Transparency = 0
+text.BackgroundTransparency = 1
+task.wait(0.1)
+
+text.Transparency = 0
+text.BackgroundTransparency = 1
+task.wait(1)
+text.BackgroundTransparency = 1
+task.wait(0.1)
+text.Transparency = 0.2
+text.BackgroundTransparency = 1
+task.wait(0.1)
+text.Transparency = 0.4
+text.BackgroundTransparency = 1
+task.wait(0.1)
+text.Transparency = 0.6
+text.BackgroundTransparency = 1
+task.wait(0.1)
+text.Transparency = 0.8
+text.BackgroundTransparency = 1
+task.wait(0.1)
+text.Transparency = 1
+text.BackgroundTransparency = 1
+task.wait(3)
+AntiCheatMessage:Destroy()
