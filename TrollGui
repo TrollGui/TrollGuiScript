@@ -6063,82 +6063,118 @@ BypassNoclipAnticheat = {
         local RunService = game:GetService("RunService")
         local Players = game:GetService("Players")
         local player = Players.LocalPlayer
+
         if not player then return end
 
-        if not getgenv().GoThroughData then
-            getgenv().GoThroughData = {
-                ConnNoClip = nil,
-                ConnLoopMove = nil,
-                InputBegan = nil,
-                InputEnded = nil,
-                FocusLost = nil,
-                IsHoldingV = false,
-                ActiveState = false,
-                Initialized = false
-            }
-        end
+        getgenv().GoThroughData = getgenv().GoThroughData or {
+            ConnNoClip = nil,
+            ConnInputBegan = nil,
+            ConnInputEnded = nil,
+            ConnFocusLost = nil,
+            ActiveState = false,
+            IsHoldingV = false,
+            OriginalCollision = {}
+        }
 
         local data = getgenv().GoThroughData
         data.ActiveState = state
 
-        if not state then
-            data.IsHoldingV = false
-            return
+        local function restoreCollision()
+            for part, originalValue in pairs(data.OriginalCollision) do
+                if part and part.Parent then
+                    pcall(function()
+                        part.CanCollide = originalValue
+                    end)
+                end
+            end
+
+            table.clear(data.OriginalCollision)
         end
 
-        if not data.Initialized then
-            data.Initialized = true
+        local function disableNoclip()
+            data.IsHoldingV = false
+            restoreCollision()
+        end
 
-            data.InputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        local function enableNoclip()
+            if not data.ActiveState or not data.IsHoldingV then
+                return
+            end
+
+            local character = player.Character
+            if not character then return end
+
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    if data.OriginalCollision[part] == nil then
+                        data.OriginalCollision[part] = part.CanCollide
+                    end
+
+                    pcall(function()
+                        part.CanCollide = false
+                    end)
+                end
+            end
+        end
+
+        if not data.ConnInputBegan then
+            data.ConnInputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 if gameProcessed then return end
-                if input.KeyCode == Enum.KeyCode.V then
-                    data.IsHoldingV = true
-                end
-            end)
-
-            data.InputEnded = UserInputService.InputEnded:Connect(function(input)
-                if input.KeyCode == Enum.KeyCode.V then
-                    data.IsHoldingV = false
-                end
-            end)
-
-            data.FocusLost = UserInputService.WindowFocusReleased:Connect(function()
-                data.IsHoldingV = false
-            end)
-
-            data.ConnNoClip = RunService.Stepped:Connect(function()
+                if input.KeyCode ~= Enum.KeyCode.V then return end
                 if not data.ActiveState then return end
-                if not UserInputService:IsKeyDown(Enum.KeyCode.V) then
+
+                data.IsHoldingV = true
+            end)
+        end
+
+        if not data.ConnInputEnded then
+            data.ConnInputEnded = UserInputService.InputEnded:Connect(function(input)
+                if input.KeyCode ~= Enum.KeyCode.V then return end
+
+                disableNoclip()
+            end)
+        end
+
+        if not data.ConnFocusLost then
+            data.ConnFocusLost = UserInputService.WindowFocusReleased:Connect(function()
+                disableNoclip()
+            end)
+        end
+
+        if not data.ConnNoClip then
+            data.ConnNoClip = RunService.Stepped:Connect(function()
+                if not data.ActiveState then
+                    if next(data.OriginalCollision) then
+                        restoreCollision()
+                    end
+
                     data.IsHoldingV = false
                     return
                 end
-                data.IsHoldingV = true
-                if player.Character then
-                    for _, p in ipairs(player.Character:GetDescendants()) do
-                        if p:IsA("BasePart") then
-                            pcall(function()
-                                p.CanCollide = false
-                            end)
-                        end
-                    end
-                end
-            end)
 
-            task.spawn(function()
-                while true do
-                    task.wait(0.01)
-                    if not data.ActiveState then continue end
-                    if not UserInputService:IsKeyDown(Enum.KeyCode.V) then
-                        data.IsHoldingV = false
-                        continue
+                if not UserInputService:IsKeyDown(Enum.KeyCode.V) then
+                    if data.IsHoldingV then
+                        disableNoclip()
                     end
-                    local character = player.Character
-                    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-                    if rootPart then
-                        rootPart.CFrame = rootPart.CFrame + (rootPart.CFrame.LookVector * 0.01)
-                    end
+
+                    return
+                end
+
+                data.IsHoldingV = true
+
+                enableNoclip()
+
+                local character = player.Character
+                local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+
+                if rootPart then
+                    rootPart.CFrame = rootPart.CFrame + (rootPart.CFrame.LookVector * 0.01)
                 end
             end)
+        end
+
+        if not state then
+            disableNoclip()
         end
     end
 },
