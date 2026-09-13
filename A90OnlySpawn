@@ -1,0 +1,529 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local SoundService = game:GetService("SoundService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+local ENABLE_RESPAWN = false
+
+local SOUND_APPEAR_LEAD_TIME = 0.5
+
+local INITIAL_DELAY = 1
+
+local MIN_INTERVAL = 30
+local MAX_INTERVAL = 100
+
+local DAMAGE = 90
+
+local DETECTION_WINDOW = 1.1
+
+local SOUND_APPEAR = "rbxassetid://92453621152905"
+local SOUND_ATTACK = "rbxassetid://84909470598244"
+local SOUND_DEATH  = "rbxassetid://98965343663928"
+
+local IMG_NORMAL    = "rbxassetid://12350997663"
+local IMG_GLITCH    = "rbxassetid://12440673931"
+local IMG_JUMPSCARE = "rbxassetid://12436809127"
+
+local STATIC_TEXTURE = "rbxassetid://9470965"
+
+local CARMINE = Color3.fromRGB(150, 5, 25)
+local RED     = Color3.fromRGB(255, 0, 0)
+local BLACK   = Color3.fromRGB(0, 0, 0)
+local WHITE   = Color3.fromRGB(255, 255, 255)
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "A90Jumpscare"
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 999999
+gui.Parent = PlayerGui
+
+local face = Instance.new("ImageLabel")
+face.Name = "A90Face"
+face.BackgroundTransparency = 1
+face.BorderSizePixel = 0
+face.AnchorPoint = Vector2.new(0.5, 0.5)
+face.Size = UDim2.fromOffset(240, 240)
+face.Position = UDim2.fromScale(0.5, 0.5)
+face.Image = IMG_NORMAL
+face.ImageColor3 = WHITE
+face.Visible = false
+face.ZIndex = 20
+face.Parent = gui
+
+local jumpscare = Instance.new("ImageLabel")
+jumpscare.Name = "A90Jumpscare"
+jumpscare.BackgroundTransparency = 1
+jumpscare.BorderSizePixel = 0
+jumpscare.AnchorPoint = Vector2.new(0.5, 0.5)
+jumpscare.Size = UDim2.fromScale(1, 1)
+jumpscare.Position = UDim2.fromScale(0.5, 0.5)
+jumpscare.Image = IMG_JUMPSCARE
+jumpscare.ImageColor3 = WHITE
+jumpscare.Visible = false
+jumpscare.ZIndex = 30
+jumpscare.ScaleType = Enum.ScaleType.Fit
+jumpscare.Parent = gui
+
+local background = Instance.new("Frame")
+background.Name = "FinalBackground"
+background.Size = UDim2.fromScale(1, 1)
+background.Position = UDim2.fromScale(0, 0)
+background.BorderSizePixel = 0
+background.BackgroundColor3 = WHITE
+background.BackgroundTransparency = 0
+background.Visible = false
+background.ZIndex = 40
+background.Parent = gui
+
+local vignette = Instance.new("Frame")
+vignette.Name = "FinalVignette"
+vignette.Size = UDim2.fromScale(1, 1)
+vignette.Position = UDim2.fromScale(0, 0)
+vignette.BorderSizePixel = 0
+vignette.BackgroundColor3 = RED
+vignette.BackgroundTransparency = 0.15
+vignette.Visible = false
+vignette.ZIndex = 50
+vignette.Parent = gui
+
+local vignetteGradient = Instance.new("UIGradient")
+vignetteGradient.Transparency = NumberSequence.new({
+	NumberSequenceKeypoint.new(0, 0.15),
+	NumberSequenceKeypoint.new(0.2, 0.4),
+	NumberSequenceKeypoint.new(0.5, 0.9),
+	NumberSequenceKeypoint.new(0.8, 0.4),
+	NumberSequenceKeypoint.new(1, 0.15)
+})
+vignetteGradient.Parent = vignette
+
+local staticPart
+local staticCarmine
+local staticBlack
+local staticConnection
+local staticActive = false
+local staticAttack = false
+
+local function createStaticPart()
+	if staticPart then
+		staticPart:Destroy()
+	end
+
+	local camera = workspace.CurrentCamera
+
+	if not camera then
+		return
+	end
+
+	staticPart = Instance.new("Part")
+	staticPart.Name = "A90Static"
+	staticPart.Anchored = true
+	staticPart.CanCollide = false
+	staticPart.CanTouch = false
+	staticPart.CanQuery = false
+	staticPart.CastShadow = false
+	staticPart.Material = Enum.Material.SmoothPlastic
+	staticPart.Transparency = 1
+	staticPart.Size = Vector3.new(20, 20, 0.05)
+	staticPart.Parent = workspace
+
+	staticCarmine = Instance.new("Texture")
+	staticCarmine.Name = "CarmineStatic"
+	staticCarmine.Texture = STATIC_TEXTURE
+	staticCarmine.Face = Enum.NormalId.Front
+	staticCarmine.Color3 = CARMINE
+	staticCarmine.Transparency = 0
+	staticCarmine.StudsPerTileU = 0.35
+	staticCarmine.StudsPerTileV = 0.35
+	staticCarmine.OffsetStudsU = math.random()
+	staticCarmine.OffsetStudsV = math.random()
+	staticCarmine.Parent = staticPart
+
+	staticBlack = Instance.new("Texture")
+	staticBlack.Name = "BlackStatic"
+	staticBlack.Texture = STATIC_TEXTURE
+	staticBlack.Face = Enum.NormalId.Front
+	staticBlack.Color3 = BLACK
+	staticBlack.Transparency = 0.35
+	staticBlack.StudsPerTileU = 0.35
+	staticBlack.StudsPerTileV = 0.35
+	staticBlack.OffsetStudsU = math.random()
+	staticBlack.OffsetStudsV = math.random()
+	staticBlack.Parent = staticPart
+
+	staticActive = true
+	staticAttack = false
+
+	if staticConnection then
+		staticConnection:Disconnect()
+	end
+
+	staticConnection = RunService.RenderStepped:Connect(function()
+		if not staticActive or not staticPart or not staticPart.Parent then
+			return
+		end
+
+		camera = workspace.CurrentCamera
+
+		if not camera then
+			return
+		end
+
+		local distance = 0.7
+		local viewport = camera.ViewportSize
+
+		local aspect = viewport.X / math.max(viewport.Y, 1)
+		local verticalSize = 2 * distance * math.tan(math.rad(camera.FieldOfView * 0.5))
+		local horizontalSize = verticalSize * aspect
+
+		staticPart.Size = Vector3.new(
+			horizontalSize,
+			verticalSize,
+			0.05
+		)
+
+		local cameraPosition = camera.CFrame.Position
+		local targetPosition = cameraPosition + camera.CFrame.LookVector * distance
+
+		staticPart.CFrame = CFrame.lookAt(
+			targetPosition,
+			cameraPosition
+		)
+
+		staticCarmine.OffsetStudsU = math.random() * 2
+		staticCarmine.OffsetStudsV = math.random() * 2
+
+		staticBlack.OffsetStudsU = math.random() * 2
+		staticBlack.OffsetStudsV = math.random() * 2
+
+		if staticAttack then
+			staticCarmine.Color3 = RED
+			staticBlack.Color3 = RED
+
+			staticCarmine.Transparency = math.random(0, 10) / 100
+			staticBlack.Transparency = math.random(10, 50) / 100
+
+			if math.random() < 0.18 then
+				staticCarmine.StudsPerTileU = math.random(25, 45) / 100
+				staticCarmine.StudsPerTileV = math.random(25, 45) / 100
+			end
+
+			if math.random() < 0.18 then
+				staticBlack.StudsPerTileU = math.random(25, 45) / 100
+				staticBlack.StudsPerTileV = math.random(25, 45) / 100
+			end
+		else
+			staticCarmine.Color3 = CARMINE
+			staticBlack.Color3 = BLACK
+			staticCarmine.Transparency = 0
+			staticBlack.Transparency = 0.35
+		end
+	end)
+end
+
+local function destroyStatic()
+	staticActive = false
+
+	if staticConnection then
+		staticConnection:Disconnect()
+		staticConnection = nil
+	end
+
+	if staticPart then
+		staticPart:Destroy()
+		staticPart = nil
+	end
+
+	staticCarmine = nil
+	staticBlack = nil
+end
+
+local function playSound(id, volume)
+	local sound = Instance.new("Sound")
+	sound.SoundId = id
+	sound.Volume = volume or 1
+	sound.Looped = false
+	sound.Parent = SoundService
+
+	local loadedConn
+	loadedConn = sound.Loaded:Connect(function()
+		sound:Play()
+		if loadedConn then
+			loadedConn:Disconnect()
+		end
+	end)
+
+	task.spawn(function()
+		task.wait(0.1)
+		if sound and sound.Parent and not sound.IsPlaying then
+			sound:Play()
+		end
+	end)
+
+	task.delay(8, function()
+		if sound then
+			sound:Destroy()
+		end
+	end)
+
+	return sound
+end
+
+local function playerIsMoving()
+	local character = Player.Character
+
+	if not character then
+		return false
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+	if humanoid and humanoid.MoveDirection.Magnitude > 0.05 then
+		return true
+	end
+
+	return false
+end
+
+local function damagePlayer()
+	local character = Player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+	if humanoid then
+		pcall(function()
+			humanoid:TakeDamage(DAMAGE)
+		end)
+	end
+
+	local remote = ReplicatedStorage:FindFirstChild("A90Remote", true)
+
+	if remote and remote:IsA("RemoteEvent") then
+		pcall(function()
+			remote:FireServer("Damage", DAMAGE)
+		end)
+	end
+end
+
+local function attack()
+	staticAttack = true
+
+	if staticCarmine then
+		staticCarmine.Color3 = RED
+	end
+
+	if staticBlack then
+		staticBlack.Color3 = RED
+	end
+
+	playSound(SOUND_ATTACK, 1.5)
+
+	face.Image = IMG_GLITCH
+	face.ImageColor3 = WHITE
+
+	task.wait(0.4)
+
+	face.Visible = false
+
+	task.wait(0.2)
+
+	jumpscare.Visible = true
+
+	local shakeStart = os.clock()
+
+	while os.clock() - shakeStart < 1 do
+		jumpscare.Position = UDim2.fromScale(
+			0.5 + math.random(-12, 12) / 1000,
+			0.5 + math.random(-12, 12) / 1000
+		)
+
+		jumpscare.Rotation = math.random(-3, 3)
+
+		task.wait(0.025)
+	end
+
+	jumpscare.Position = UDim2.fromScale(0.5, 0.5)
+	jumpscare.Rotation = 0
+	jumpscare.Visible = false
+
+	destroyStatic()
+
+	background.Visible = true
+	background.BackgroundColor3 = WHITE
+	background.BackgroundTransparency = 0
+
+	task.wait(0.2)
+
+	background.BackgroundColor3 = RED
+
+	task.wait(0.2)
+
+	local fade = TweenService:Create(
+		background,
+		TweenInfo.new(0.7, Enum.EasingStyle.Linear),
+		{
+			BackgroundTransparency = 1
+		}
+	)
+
+	fade:Play()
+	fade.Completed:Wait()
+
+	background.Visible = false
+
+	playSound(SOUND_DEATH, 1.5)
+
+	damagePlayer()
+
+	vignette.Visible = true
+	vignette.BackgroundTransparency = 0.15
+
+	local vignetteFade = TweenService:Create(
+		vignette,
+		TweenInfo.new(15, Enum.EasingStyle.Linear),
+		{
+			BackgroundTransparency = 1
+		}
+	)
+
+	vignetteFade:Play()
+	vignetteFade.Completed:Wait()
+
+	vignette.Visible = false
+
+	local remote = ReplicatedStorage:FindFirstChild("A90Remote", true)
+
+	if remote and remote:IsA("RemoteEvent") then
+		pcall(function()
+			remote:FireServer("Died", "A-90")
+		end)
+	end
+end
+
+local function runA90()
+	gui.Enabled = true
+
+	face.Visible = false
+	jumpscare.Visible = false
+	background.Visible = false
+	vignette.Visible = false
+
+	face.ImageTransparency = 0
+
+	createStaticPart()
+
+	playSound(SOUND_APPEAR, 1)
+
+	if SOUND_APPEAR_LEAD_TIME > 0 then
+		task.wait(SOUND_APPEAR_LEAD_TIME)
+	end
+
+	face.Image = IMG_NORMAL
+	face.ImageColor3 = WHITE
+	face.Size = UDim2.fromOffset(240, 240)
+
+	face.Position = UDim2.fromScale(
+		math.random(15, 85) / 100,
+		math.random(15, 85) / 100
+	)
+
+	face.Visible = true
+
+	task.wait(0.35)
+
+	face.Position = UDim2.fromScale(0.5, 0.5)
+
+	local character = Player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local startPosition = root and root.Position
+
+	local moved = false
+	local detectionStart = os.clock()
+
+	local inputConnection = UserInputService.InputBegan:Connect(function(input, processed)
+		if processed then
+			return
+		end
+
+		if input.UserInputType == Enum.UserInputType.Keyboard then
+			local key = input.KeyCode
+
+			if key == Enum.KeyCode.W
+				or key == Enum.KeyCode.A
+				or key == Enum.KeyCode.S
+				or key == Enum.KeyCode.D
+				or key == Enum.KeyCode.Space
+				or key == Enum.KeyCode.Up
+				or key == Enum.KeyCode.Down
+				or key == Enum.KeyCode.Left
+				or key == Enum.KeyCode.Right then
+
+				moved = true
+			end
+		elseif input.UserInputType == Enum.UserInputType.Gamepad1 then
+			moved = true
+		elseif input.UserInputType == Enum.UserInputType.Touch then
+			moved = true
+		end
+	end)
+
+	while os.clock() - detectionStart < DETECTION_WINDOW do
+		if not moved and playerIsMoving() then
+			moved = true
+		end
+
+		character = Player.Character
+		root = character and character:FindFirstChild("HumanoidRootPart")
+
+		if not moved and root and startPosition then
+			if (root.Position - startPosition).Magnitude > 0.08 then
+				moved = true
+			end
+		end
+
+		task.wait()
+	end
+
+	inputConnection:Disconnect()
+
+	if moved then
+		attack()
+		return
+	end
+
+	local fadeFace = TweenService:Create(
+		face,
+		TweenInfo.new(0.2, Enum.EasingStyle.Linear),
+		{
+			ImageTransparency = 1
+		}
+	)
+
+	fadeFace:Play()
+	fadeFace.Completed:Wait()
+
+	face.ImageTransparency = 0
+	face.Visible = false
+
+	destroyStatic()
+end
+
+task.spawn(function()
+	task.wait(INITIAL_DELAY)
+
+	if ENABLE_RESPAWN then
+
+		while true do
+			pcall(runA90)
+
+			task.wait(math.random(MIN_INTERVAL, MAX_INTERVAL))
+		end
+	else
+
+		pcall(runA90)
+	end
+end)
