@@ -6055,128 +6055,198 @@ ReviveFree = {
     end)()
 },
 BypassNoclipAnticheat = {
-    Nome = "Bypass Noclip Anticheat",
-    IsToggle = true,
-    Repeat = false,
-    Script = function(state)
-        local UserInputService = game:GetService("UserInputService")
-        local RunService = game:GetService("RunService")
-        local Players = game:GetService("Players")
-        local player = Players.LocalPlayer
+Nome = "Bypass Noclip Anticheat",
+IsToggle = true,
+Repeat = false,
+Script = function(state)
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+    if not player then return end
 
-        if not player then return end
+    getgenv().GoThroughData = getgenv().GoThroughData or {
+        ConnNoClip = nil,
+        ConnInputBegan = nil,
+        ConnInputEnded = nil,
+        ConnFocusLost = nil,
+        ActiveState = false,
+        IsHoldingV = false,
+        OriginalCollision = {},
+        OriginalWalkSpeed = nil,
+        OriginalJumpPower = nil,
+        OriginalAutoRotate = nil
+    }
 
-        getgenv().GoThroughData = getgenv().GoThroughData or {
-            ConnNoClip = nil,
-            ConnInputBegan = nil,
-            ConnInputEnded = nil,
-            ConnFocusLost = nil,
-            ActiveState = false,
-            IsHoldingV = false,
-            OriginalCollision = {}
-        }
+    local data = getgenv().GoThroughData
+    data.ActiveState = state
 
-        local data = getgenv().GoThroughData
-        data.ActiveState = state
+    local function getCharacter()
+        return player.Character
+    end
 
-        local function restoreCollision()
-            for part, originalValue in pairs(data.OriginalCollision) do
-                if part and part.Parent then
-                    pcall(function()
-                        part.CanCollide = originalValue
-                    end)
-                end
+    local function getHumanoid()
+        local character = getCharacter()
+        return character and character:FindFirstChildOfClass("Humanoid")
+    end
+
+    local function getRootPart()
+        local character = getCharacter()
+        return character and character:FindFirstChild("HumanoidRootPart")
+    end
+
+    local function restoreCollision()
+        for part, originalValue in pairs(data.OriginalCollision) do
+            if part and part.Parent then
+                pcall(function()
+                    part.CanCollide = originalValue
+                end)
+            end
+        end
+
+        table.clear(data.OriginalCollision)
+    end
+
+    local function restoreMovement()
+        local humanoid = getHumanoid()
+
+        if humanoid then
+            if data.OriginalWalkSpeed ~= nil then
+                humanoid.WalkSpeed = data.OriginalWalkSpeed
             end
 
-            table.clear(data.OriginalCollision)
+            if data.OriginalJumpPower ~= nil then
+                humanoid.JumpPower = data.OriginalJumpPower
+            end
+
+            if data.OriginalAutoRotate ~= nil then
+                humanoid.AutoRotate = data.OriginalAutoRotate
+            end
+
+            humanoid:Move(Vector3.zero, true)
         end
 
-        local function disableNoclip()
-            data.IsHoldingV = false
-            restoreCollision()
+        data.OriginalWalkSpeed = nil
+        data.OriginalJumpPower = nil
+        data.OriginalAutoRotate = nil
+    end
+
+    local function disableNoclip()
+        data.IsHoldingV = false
+        restoreCollision()
+        restoreMovement()
+    end
+
+    local function enableNoclip()
+        if not data.ActiveState or not data.IsHoldingV then
+            return
         end
 
-        local function enableNoclip()
-            if not data.ActiveState or not data.IsHoldingV then
+        local character = getCharacter()
+        local humanoid = getHumanoid()
+        local rootPart = getRootPart()
+
+        if not character or not humanoid or not rootPart then
+            return
+        end
+
+        if data.OriginalWalkSpeed == nil then
+            data.OriginalWalkSpeed = humanoid.WalkSpeed
+        end
+
+        if data.OriginalJumpPower == nil then
+            data.OriginalJumpPower = humanoid.JumpPower
+        end
+
+        if data.OriginalAutoRotate == nil then
+            data.OriginalAutoRotate = humanoid.AutoRotate
+        end
+
+        humanoid.WalkSpeed = 0
+        humanoid.JumpPower = 0
+        humanoid.AutoRotate = false
+        humanoid:Move(Vector3.zero, true)
+
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                if data.OriginalCollision[part] == nil then
+                    data.OriginalCollision[part] = part.CanCollide
+                end
+
+                part.CanCollide = false
+                part.Anchored = false
+            end
+        end
+
+        local humanoidState = humanoid:GetState()
+
+        if humanoidState == Enum.HumanoidStateType.Freefall
+            or humanoidState == Enum.HumanoidStateType.FallingDown then
+
+            rootPart.AssemblyLinearVelocity = Vector3.new(
+                rootPart.AssemblyLinearVelocity.X,
+                0,
+                rootPart.AssemblyLinearVelocity.Z
+            )
+
+            rootPart.AssemblyAngularVelocity = Vector3.zero
+        end
+
+        rootPart.CFrame = rootPart.CFrame + (rootPart.CFrame.LookVector * 0.01)
+    end
+
+    if not data.ConnInputBegan then
+        data.ConnInputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if input.KeyCode ~= Enum.KeyCode.V then return end
+            if not data.ActiveState then return end
+
+            data.IsHoldingV = true
+        end)
+    end
+
+    if not data.ConnInputEnded then
+        data.ConnInputEnded = UserInputService.InputEnded:Connect(function(input)
+            if input.KeyCode ~= Enum.KeyCode.V then return end
+
+            disableNoclip()
+        end)
+    end
+
+    if not data.ConnFocusLost then
+        data.ConnFocusLost = UserInputService.WindowFocusReleased:Connect(function()
+            disableNoclip()
+        end)
+    end
+
+    if not data.ConnNoClip then
+        data.ConnNoClip = RunService.Stepped:Connect(function()
+            if not data.ActiveState then
+                if data.IsHoldingV or next(data.OriginalCollision) then
+                    disableNoclip()
+                end
+
                 return
             end
 
-            local character = player.Character
-            if not character then return end
-
-            for _, part in ipairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    if data.OriginalCollision[part] == nil then
-                        data.OriginalCollision[part] = part.CanCollide
-                    end
-
-                    pcall(function()
-                        part.CanCollide = false
-                    end)
+            if not UserInputService:IsKeyDown(Enum.KeyCode.V) then
+                if data.IsHoldingV then
+                    disableNoclip()
                 end
+
+                return
             end
-        end
 
-        if not data.ConnInputBegan then
-            data.ConnInputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-                if gameProcessed then return end
-                if input.KeyCode ~= Enum.KeyCode.V then return end
-                if not data.ActiveState then return end
+            data.IsHoldingV = true
 
-                data.IsHoldingV = true
-            end)
-        end
-
-        if not data.ConnInputEnded then
-            data.ConnInputEnded = UserInputService.InputEnded:Connect(function(input)
-                if input.KeyCode ~= Enum.KeyCode.V then return end
-
-                disableNoclip()
-            end)
-        end
-
-        if not data.ConnFocusLost then
-            data.ConnFocusLost = UserInputService.WindowFocusReleased:Connect(function()
-                disableNoclip()
-            end)
-        end
-
-        if not data.ConnNoClip then
-            data.ConnNoClip = RunService.Stepped:Connect(function()
-                if not data.ActiveState then
-                    if next(data.OriginalCollision) then
-                        restoreCollision()
-                    end
-
-                    data.IsHoldingV = false
-                    return
-                end
-
-                if not UserInputService:IsKeyDown(Enum.KeyCode.V) then
-                    if data.IsHoldingV then
-                        disableNoclip()
-                    end
-
-                    return
-                end
-
-                data.IsHoldingV = true
-
-                enableNoclip()
-
-                local character = player.Character
-                local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-
-                if rootPart then
-                    rootPart.CFrame = rootPart.CFrame + (rootPart.CFrame.LookVector * 0.01)
-                end
-            end)
-        end
-
-        if not state then
-            disableNoclip()
-        end
+            enableNoclip()
+        end)
     end
+
+    if not state then
+        disableNoclip()
+    end
+end
 },
 }
 -- FIM DA SEÇÃO DE BOTÕES ↑↑↑
