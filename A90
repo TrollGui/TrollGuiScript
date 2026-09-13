@@ -1,0 +1,2722 @@
+local TweenService      = game:GetService("TweenService")
+local Players           = game:GetService("Players")
+local RunService        = game:GetService("RunService")
+local UserInputService  = game:GetService("UserInputService")
+local SoundService      = game:GetService("SoundService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChatService   = game:GetService("TextChatService")
+
+local player    = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local camera    = workspace.CurrentCamera
+
+local SOUND_BUTTON      = "rbxassetid://139310882854462"
+local SOUND_DOWNLOADING = "rbxassetid://138548878793475"
+
+local ENABLE_RESPAWN         = true
+local SOUND_APPEAR_LEAD_TIME = 0.5
+local INITIAL_DELAY          = 1
+local MIN_INTERVAL           = 30
+local MAX_INTERVAL           = 100
+local DAMAGE                 = 90
+
+local SOUND_APPEAR = "rbxassetid://92453621152905"
+local SOUND_ATTACK = "rbxassetid://84909470598244"
+local SOUND_DEATH  = "rbxassetid://98965343663928"
+
+local SOUND_UNINSTALL_BUTTON  = "rbxassetid://4810730526"
+local SOUND_UNINSTALLING_LOOP = "rbxassetid://121966061867746"
+local SOUND_HEART_CORRECT     = "rbxassetid://18665418323"
+local SOUND_HEART_WRONG       = "rbxassetid://131500586020769"
+local SOUND_UNINSTALL_FINAL   = "rbxassetid://110205432201626"
+local SOUND_MOUSE_CHECK       = "rbxassetid://138533090376585"
+local SOUND_EVENT_RANDOM      = "rbxassetid://98025843744912"
+local SOUND_LOSE_BATTLE       = "rbxassetid://126891114484570"
+
+local IMG_NORMAL     = "rbxassetid://12350997663"
+local IMG_GLITCH     = "rbxassetid://12440673931"
+local IMG_JUMPSCARE  = "rbxassetid://12436809127"
+local STATIC_TEXTURE = "rbxassetid://9470965"
+
+local CARMINE  = Color3.fromRGB(150, 5, 25)
+local RED      = Color3.fromRGB(255, 0, 0)
+local BLACK    = Color3.fromRGB(0, 0, 0)
+local WHITE    = Color3.fromRGB(255, 255, 255)
+local LIME     = Color3.fromRGB(50, 255, 50)
+local LIME_DK  = Color3.fromRGB(0, 150, 0)
+local GREEN    = Color3.fromRGB(0, 255, 0)
+local BLUE     = Color3.fromRGB(80, 180, 255)
+local BLUE_DK  = Color3.fromRGB(0, 80, 200)
+local PINK     = Color3.fromRGB(255, 105, 180)
+local PINK_DK  = Color3.fromRGB(200, 0, 100)
+local YELLOW   = Color3.fromRGB(255, 230, 0)
+local CYAN     = Color3.fromRGB(0, 255, 255)
+
+local uninstallMode       = false
+local a90SpawnInterval    = nil
+local a90AttackEnabled    = true
+local a90SpawnerStop      = false
+local playerHP            = 100
+local maxHP               = 100
+local backgroundEventsActive = false
+local backgroundEventsThread = nil
+
+local activeSounds = {}
+
+local function playSound(id, volume, looped, parent)
+    local s = Instance.new("Sound")
+    s.SoundId = id
+    s.Volume = volume or 1
+    s.Looped = looped or false
+    s.Parent = parent or SoundService
+
+    s:Play()
+    local conn
+    conn = s.Loaded:Connect(function()
+        s:Play()
+        if conn then conn:Disconnect() end
+    end)
+
+    task.delay(0.1, function()
+        if s and s.Parent and not s.IsPlaying then
+            s:Play()
+        end
+    end)
+
+    table.insert(activeSounds, s)
+    task.delay(120, function()
+        for i, v in ipairs(activeSounds) do
+            if v == s then table.remove(activeSounds, i) break end
+        end
+        if s and s.Parent then s:Destroy() end
+    end)
+
+    return s
+end
+
+local function stopSound(s)
+    if s then
+        pcall(function() s:Stop() end)
+        pcall(function() s:Destroy() end)
+    end
+end
+
+local pulseThreads = {}
+
+local function startPulse(guiObj, baseScale, speed)
+    baseScale = baseScale or 1.05
+    speed = speed or 1.5
+
+    if pulseThreads[guiObj] then
+        task.cancel(pulseThreads[guiObj])
+        pulseThreads[guiObj] = nil
+    end
+
+    local baseSize = guiObj.Size
+    local thread = task.spawn(function()
+        while guiObj and guiObj.Parent and guiObj.Visible do
+            local t = TweenService:Create(guiObj, TweenInfo.new(speed / 2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+                Size = UDim2.new(baseSize.X.Scale, baseSize.X.Offset * baseScale, baseSize.Y.Scale, baseSize.Y.Offset * baseScale),
+            })
+            t:Play()
+            t.Completed:Wait()
+            if not (guiObj and guiObj.Parent and guiObj.Visible) then break end
+
+            local t2 = TweenService:Create(guiObj, TweenInfo.new(speed / 2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+                Size = baseSize,
+            })
+            t2:Play()
+            t2.Completed:Wait()
+        end
+    end)
+
+    pulseThreads[guiObj] = thread
+    return thread
+end
+
+local function stopPulse(guiObj)
+    if pulseThreads[guiObj] then
+        task.cancel(pulseThreads[guiObj])
+        pulseThreads[guiObj] = nil
+    end
+end
+
+local function animateButtonAppear(btn, baseSize)
+    task.spawn(function()
+        local function tw(size, time, style)
+            local t = TweenService:Create(btn, TweenInfo.new(time, style or Enum.EasingStyle.Quad), {Size = size})
+            t:Play()
+            t.Completed:Wait()
+        end
+        tw(UDim2.new(0, baseSize.X.Offset * 1.3, 0, baseSize.Y.Offset * 1.3), 0.15)
+        tw(UDim2.new(0, baseSize.X.Offset * 0.7, 0, baseSize.Y.Offset * 0.7), 0.15)
+        tw(baseSize, 0.18, Enum.EasingStyle.Back)
+
+        startPulse(btn, 1.08, 1.4)
+    end)
+end
+
+local function animateButtonDisappear(btn, baseSize)
+    stopPulse(btn)
+    task.spawn(function()
+        local function tw(size, time, style)
+            local t = TweenService:Create(btn, TweenInfo.new(time, style or Enum.EasingStyle.Quad), {Size = size})
+            t:Play()
+            t.Completed:Wait()
+        end
+        tw(UDim2.new(0, baseSize.X.Offset * 1.3, 0, baseSize.Y.Offset * 1.3), 0.12)
+        tw(UDim2.new(0, baseSize.X.Offset * 0.5, 0, baseSize.Y.Offset * 0.5), 0.12)
+        tw(UDim2.new(0, 0, 0, 0), 0.18)
+        btn.Visible = false
+    end)
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DownloadEventGui"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.DisplayOrder = 99999
+screenGui.Parent = playerGui
+
+local fullScreenStatic = Instance.new("ImageLabel")
+fullScreenStatic.Name = "FullScreenStatic"
+fullScreenStatic.Size = UDim2.new(1, 0, 1, 0)
+fullScreenStatic.BackgroundTransparency = 1
+fullScreenStatic.Image = STATIC_TEXTURE
+fullScreenStatic.ImageColor3 = RED
+fullScreenStatic.ImageTransparency = 0.25
+fullScreenStatic.ScaleType = Enum.ScaleType.Tile
+fullScreenStatic.TileSize = UDim2.new(0, 60, 0, 60)
+fullScreenStatic.ZIndex = 4
+fullScreenStatic.Visible = false
+fullScreenStatic.Parent = screenGui
+
+local fullScreenStatic2 = Instance.new("ImageLabel")
+fullScreenStatic2.Name = "FullScreenStatic2"
+fullScreenStatic2.Size = UDim2.new(1, 0, 1, 0)
+fullScreenStatic2.BackgroundTransparency = 1
+fullScreenStatic2.Image = STATIC_TEXTURE
+fullScreenStatic2.ImageColor3 = BLACK
+fullScreenStatic2.ImageTransparency = 0.5
+fullScreenStatic2.ScaleType = Enum.ScaleType.Tile
+fullScreenStatic2.TileSize = UDim2.new(0, 40, 0, 40)
+fullScreenStatic2.ZIndex = 5
+fullScreenStatic2.Visible = false
+fullScreenStatic2.Parent = screenGui
+
+local downloadingBg = Instance.new("Frame")
+downloadingBg.Name = "DownloadingBackground"
+downloadingBg.Size = UDim2.new(1, 0, 1, 0)
+downloadingBg.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+downloadingBg.BorderSizePixel = 0
+downloadingBg.ZIndex = 18
+downloadingBg.Visible = false
+downloadingBg.Parent = screenGui
+
+local downloadingBgStatic = Instance.new("ImageLabel")
+downloadingBgStatic.Name = "BgStatic"
+downloadingBgStatic.Size = UDim2.new(1, 0, 1, 0)
+downloadingBgStatic.BackgroundTransparency = 1
+downloadingBgStatic.Image = STATIC_TEXTURE
+downloadingBgStatic.ImageColor3 = Color3.fromRGB(60, 0, 0)
+downloadingBgStatic.ImageTransparency = 0.35
+downloadingBgStatic.ScaleType = Enum.ScaleType.Tile
+downloadingBgStatic.TileSize = UDim2.new(0, 50, 0, 50)
+downloadingBgStatic.ZIndex = 19
+downloadingBgStatic.Parent = downloadingBg
+
+local downloadingBgStatic2 = Instance.new("ImageLabel")
+downloadingBgStatic2.Name = "BgStatic2"
+downloadingBgStatic2.Size = UDim2.new(1, 0, 1, 0)
+downloadingBgStatic2.BackgroundTransparency = 1
+downloadingBgStatic2.Image = STATIC_TEXTURE
+downloadingBgStatic2.ImageColor3 = Color3.fromRGB(120, 0, 0)
+downloadingBgStatic2.ImageTransparency = 0.7
+downloadingBgStatic2.ScaleType = Enum.ScaleType.Tile
+downloadingBgStatic2.TileSize = UDim2.new(0, 35, 0, 35)
+downloadingBgStatic2.ZIndex = 20
+downloadingBgStatic2.Parent = downloadingBg
+
+local downloadingBgThread = nil
+local downloadingBgActive = false
+local downloadingBgColorOverride = nil
+
+local function startDownloadingBg(isGreen)
+    downloadingBg.Visible = true
+    downloadingBgActive = true
+
+    if isGreen then
+        downloadingBg.BackgroundColor3 = Color3.fromRGB(0, 20, 0)
+        downloadingBgStatic.ImageColor3 = Color3.fromRGB(0, 80, 0)
+        downloadingBgStatic2.ImageColor3 = Color3.fromRGB(0, 150, 0)
+    else
+        downloadingBg.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
+        downloadingBgStatic.ImageColor3 = Color3.fromRGB(80, 0, 0)
+        downloadingBgStatic2.ImageColor3 = Color3.fromRGB(150, 0, 0)
+    end
+
+    if downloadingBgThread then task.cancel(downloadingBgThread) end
+    downloadingBgThread = task.spawn(function()
+        while downloadingBgActive do
+            if downloadingBgColorOverride then
+                local oc = downloadingBgColorOverride
+                downloadingBg.BackgroundColor3 = oc.bg
+                downloadingBgStatic.ImageColor3 = oc.static1
+                downloadingBgStatic2.ImageColor3 = oc.static2
+            else
+                downloadingBgStatic.ImageTransparency  = math.random(20, 55) / 100
+                downloadingBgStatic2.ImageTransparency = math.random(55, 85) / 100
+                downloadingBgStatic.TileSize  = UDim2.new(0, math.random(30, 80), 0, math.random(30, 80))
+                downloadingBgStatic2.TileSize = UDim2.new(0, math.random(25, 60), 0, math.random(25, 60))
+            end
+            RunService.RenderStepped:Wait()
+        end
+    end)
+end
+
+local function stopDownloadingBg()
+    downloadingBgActive = false
+    if downloadingBgThread then
+        task.cancel(downloadingBgThread)
+        downloadingBgThread = nil
+    end
+    if downloadingBg then downloadingBg.Visible = false end
+end
+
+local fullStaticThread = nil
+local fullStaticActive = false
+
+local function startFullScreenStatic(color)
+    fullScreenStatic.Visible = true
+    fullScreenStatic2.Visible = true
+    fullStaticActive = true
+
+    fullScreenStatic.ImageColor3 = color or RED
+
+    if fullStaticThread then task.cancel(fullStaticThread) end
+    fullStaticThread = task.spawn(function()
+        while fullStaticActive do
+            fullScreenStatic.ImageTransparency  = math.random(15, 45) / 100
+            fullScreenStatic2.ImageTransparency = math.random(35, 65) / 100
+            fullScreenStatic.TileSize  = UDim2.new(0, math.random(40, 90), 0, math.random(40, 90))
+            fullScreenStatic2.TileSize = UDim2.new(0, math.random(30, 70), 0, math.random(30, 70))
+            RunService.RenderStepped:Wait()
+        end
+    end)
+end
+
+local function stopFullScreenStatic()
+    fullStaticActive = false
+    if fullStaticThread then
+        task.cancel(fullStaticThread)
+        fullStaticThread = nil
+    end
+    fullScreenStatic.Visible = false
+    fullScreenStatic2.Visible = false
+end
+
+local downloadBtn = Instance.new("TextButton")
+downloadBtn.Name = "DownloadButton"
+downloadBtn.Size = UDim2.new(0, 240, 0, 80)
+downloadBtn.Position = UDim2.new(0.5, -120, 0.04, 0)
+downloadBtn.BackgroundColor3 = Color3.fromRGB(160, 0, 0)
+downloadBtn.BorderSizePixel = 0
+downloadBtn.Text = "Download"
+downloadBtn.TextColor3 = WHITE
+downloadBtn.Font = Enum.Font.GothamBold
+downloadBtn.TextSize = 36
+downloadBtn.TextStrokeTransparency = 0.4
+downloadBtn.TextStrokeColor3 = BLACK
+downloadBtn.AutoButtonColor = false
+downloadBtn.Visible = false
+downloadBtn.ZIndex = 10
+downloadBtn.Parent = screenGui
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 12)
+btnCorner.Parent = downloadBtn
+
+local btnGradient = Instance.new("UIGradient")
+btnGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(220, 20, 20)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 0, 0)),
+})
+btnGradient.Rotation = 90
+btnGradient.Parent = downloadBtn
+
+local btnStroke = Instance.new("UIStroke")
+btnStroke.Color = WHITE
+btnStroke.Thickness = 2.5
+btnStroke.Transparency = 0.1
+btnStroke.Parent = downloadBtn
+
+local uninstallBtn = Instance.new("TextButton")
+uninstallBtn.Name = "UninstallButton"
+uninstallBtn.Size = UDim2.new(0, 240, 0, 80)
+uninstallBtn.Position = UDim2.new(0.5, -120, 0.04, 0)
+uninstallBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+uninstallBtn.BorderSizePixel = 0
+uninstallBtn.Text = "Uninstall"
+uninstallBtn.TextColor3 = WHITE
+uninstallBtn.Font = Enum.Font.GothamBold
+uninstallBtn.TextSize = 36
+uninstallBtn.TextStrokeTransparency = 0.4
+uninstallBtn.TextStrokeColor3 = BLACK
+uninstallBtn.AutoButtonColor = false
+uninstallBtn.Visible = false
+uninstallBtn.ZIndex = 500
+uninstallBtn.Parent = screenGui
+
+local uBtnCorner = Instance.new("UICorner")
+uBtnCorner.CornerRadius = UDim.new(0, 12)
+uBtnCorner.Parent = uninstallBtn
+
+local uBtnGradient = Instance.new("UIGradient")
+uBtnGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, LIME),
+    ColorSequenceKeypoint.new(1, LIME_DK),
+})
+uBtnGradient.Rotation = 90
+uBtnGradient.Parent = uninstallBtn
+
+local uBtnStroke = Instance.new("UIStroke")
+uBtnStroke.Color = WHITE
+uBtnStroke.Thickness = 2.5
+uBtnStroke.Transparency = 0.1
+uBtnStroke.Parent = uninstallBtn
+
+local downloadingGui = Instance.new("Frame")
+downloadingGui.Name = "DownloadingGui"
+downloadingGui.Size = UDim2.new(0, 700, 0, 400)
+downloadingGui.AnchorPoint = Vector2.new(0.5, 0.5)
+downloadingGui.Position = UDim2.new(0.5, 0, 0.5, 0)
+downloadingGui.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
+downloadingGui.BorderSizePixel = 0
+downloadingGui.Visible = false
+downloadingGui.ZIndex = 25
+downloadingGui.Parent = screenGui
+
+local dlCorner = Instance.new("UICorner")
+dlCorner.CornerRadius = UDim.new(0, 14)
+dlCorner.Parent = downloadingGui
+
+local dlStroke = Instance.new("UIStroke")
+dlStroke.Color = RED
+dlStroke.Thickness = 4
+dlStroke.Parent = downloadingGui
+
+local dlGradient = Instance.new("UIGradient")
+dlGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 0, 0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 0, 0)),
+})
+dlGradient.Rotation = 90
+dlGradient.Parent = downloadingGui
+
+local staticOverlay = Instance.new("ImageLabel")
+staticOverlay.Name = "StaticOverlay"
+staticOverlay.Size = UDim2.new(1, 0, 1, 0)
+staticOverlay.BackgroundTransparency = 1
+staticOverlay.Image = STATIC_TEXTURE
+staticOverlay.ImageColor3 = RED
+staticOverlay.ImageTransparency = 0.5
+staticOverlay.ScaleType = Enum.ScaleType.Tile
+staticOverlay.TileSize = UDim2.new(0, 64, 0, 64)
+staticOverlay.ZIndex = 26
+staticOverlay.Parent = downloadingGui
+
+local staticOverlay2 = Instance.new("ImageLabel")
+staticOverlay2.Name = "StaticOverlay2"
+staticOverlay2.Size = UDim2.new(1, 0, 1, 0)
+staticOverlay2.BackgroundTransparency = 1
+staticOverlay2.Image = STATIC_TEXTURE
+staticOverlay2.ImageColor3 = BLACK
+staticOverlay2.ImageTransparency = 0.7
+staticOverlay2.ScaleType = Enum.ScaleType.Tile
+staticOverlay2.TileSize = UDim2.new(0, 48, 0, 48)
+staticOverlay2.ZIndex = 27
+staticOverlay2.Parent = downloadingGui
+
+local downloadingLabel = Instance.new("TextLabel")
+downloadingLabel.Name = "DownloadingLabel"
+downloadingLabel.Size = UDim2.new(1, 0, 0, 90)
+downloadingLabel.Position = UDim2.new(0, 0, 0.13, 0)
+downloadingLabel.BackgroundTransparency = 1
+downloadingLabel.Text = "Downloading..."
+downloadingLabel.TextColor3 = WHITE
+downloadingLabel.Font = Enum.Font.GothamBold
+downloadingLabel.TextSize = 58
+downloadingLabel.TextStrokeTransparency = 0.3
+downloadingLabel.TextStrokeColor3 = BLACK
+downloadingLabel.ZIndex = 30
+downloadingLabel.Parent = downloadingGui
+
+local progressBg = Instance.new("Frame")
+progressBg.Name = "ProgressBg"
+progressBg.Size = UDim2.new(0.8, 0, 0, 50)
+progressBg.Position = UDim2.new(0.1, 0, 0.65, 0)
+progressBg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+progressBg.BorderSizePixel = 0
+progressBg.ZIndex = 30
+progressBg.Parent = downloadingGui
+
+local progressBgCorner = Instance.new("UICorner")
+progressBgCorner.CornerRadius = UDim.new(0, 8)
+progressBgCorner.Parent = progressBg
+
+local progressBgStroke = Instance.new("UIStroke")
+progressBgStroke.Color = WHITE
+progressBgStroke.Thickness = 2
+progressBgStroke.Parent = progressBg
+
+local progressFill = Instance.new("Frame")
+progressFill.Name = "ProgressFill"
+progressFill.Size = UDim2.new(0, 0, 1, 0)
+progressFill.BackgroundColor3 = RED
+progressFill.BorderSizePixel = 0
+progressFill.ZIndex = 31
+progressFill.Parent = progressBg
+
+local progressFillCorner = Instance.new("UICorner")
+progressFillCorner.CornerRadius = UDim.new(0, 8)
+progressFillCorner.Parent = progressFill
+
+local progressFillGradient = Instance.new("UIGradient")
+progressFillGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 100)),
+    ColorSequenceKeypoint.new(1, RED),
+})
+progressFillGradient.Rotation = 90
+progressFillGradient.Parent = progressFill
+
+local hateContainer = Instance.new("Frame")
+hateContainer.Name = "HateContainer"
+hateContainer.Size = UDim2.new(1, 0, 1, 0)
+hateContainer.BackgroundTransparency = 1
+hateContainer.Visible = false
+hateContainer.ZIndex = 22
+hateContainer.Parent = screenGui
+
+local hateList = {}
+local hatePhrases = {"I HATE YOU", "WHY!?", "STOP!", "NOOOO!", "LET ME OUT", "PLEASE STOP"}
+
+local function createHateTexts()
+    for _, obj in ipairs(hateList) do
+        if obj and obj.Parent then obj:Destroy() end
+    end
+    hateList = {}
+
+    local COUNT = 60
+    for i = 1, COUNT do
+        local holder = Instance.new("Frame")
+        holder.Name = "Hate_" .. i
+        holder.BackgroundTransparency = 1
+        holder.AnchorPoint = Vector2.new(0.5, 0.5)
+        holder.Size = UDim2.new(0, math.random(180, 320), 0, math.random(60, 110))
+        holder.ZIndex = 22
+        holder.Position = UDim2.new(math.random(5, 95) / 100, 0, math.random(5, 95) / 100, 0)
+        holder.Rotation = math.random(-35, 35)
+        holder.Parent = hateContainer
+
+        local tStatic = Instance.new("ImageLabel")
+        tStatic.Name = "TextStatic"
+        tStatic.Size = UDim2.new(1, 0, 1, 0)
+        tStatic.BackgroundTransparency = 1
+        tStatic.Image = STATIC_TEXTURE
+        tStatic.ImageColor3 = RED
+        tStatic.ImageTransparency = 0.4
+        tStatic.ScaleType = Enum.ScaleType.Tile
+        tStatic.TileSize = UDim2.new(0, 40, 0, 40)
+        tStatic.ZIndex = 23
+        tStatic.Parent = holder
+
+        local tLabel = Instance.new("TextLabel")
+        tLabel.Name = "Label"
+        tLabel.Size = UDim2.new(1, 0, 1, 0)
+        tLabel.BackgroundTransparency = 1
+        tLabel.Text = "I HATE YOU"
+        tLabel.TextColor3 = WHITE
+        tLabel.Font = Enum.Font.GothamBold
+        tLabel.TextSize = math.random(28, 52)
+        tLabel.TextStrokeTransparency = 0.3
+        tLabel.TextStrokeColor3 = RED
+        tLabel.Rotation = math.random(-15, 15)
+        tLabel.ZIndex = 24
+        tLabel.Parent = holder
+
+        local glitch = Instance.new("TextLabel")
+        glitch.Name = "Glitch"
+        glitch.Size = UDim2.new(1, 0, 1, 0)
+        glitch.BackgroundTransparency = 1
+        glitch.Text = "I HATE YOU"
+        glitch.TextColor3 = CYAN
+        glitch.TextTransparency = 1
+        glitch.TextSize = tLabel.TextSize
+        glitch.Font = Enum.Font.GothamBold
+        glitch.ZIndex = 23
+        glitch.Parent = holder
+
+        table.insert(hateList, holder)
+    end
+end
+
+local function deleteHateTexts()
+    for _, obj in ipairs(hateList) do
+        if obj and obj.Parent then obj:Destroy() end
+    end
+    hateList = {}
+end
+
+local hateStaticThread = nil
+local hateStaticActive = false
+
+local function startHateStatic()
+    hateStaticActive = true
+    if hateStaticThread then task.cancel(hateStaticThread) end
+    hateStaticThread = task.spawn(function()
+        while hateStaticActive do
+            for _, holder in ipairs(hateList) do
+                if holder and holder.Parent then
+                    local tStatic = holder:FindFirstChild("TextStatic")
+                    if tStatic then
+                        tStatic.ImageTransparency = math.random(25, 60) / 100
+                        tStatic.TileSize = UDim2.new(0, math.random(25, 60), 0, math.random(25, 60))
+                    end
+                end
+            end
+            RunService.RenderStepped:Wait()
+        end
+    end)
+end
+
+local function stopHateStatic()
+    hateStaticActive = false
+    if hateStaticThread then
+        task.cancel(hateStaticThread)
+        hateStaticThread = nil
+    end
+end
+
+local hateGlitchThread = nil
+local hateGlitchActive = false
+
+local function startHateGlitch()
+    hateGlitchActive = true
+    if hateGlitchThread then task.cancel(hateGlitchThread) end
+    hateGlitchThread = task.spawn(function()
+        while hateGlitchActive do
+            for _, holder in ipairs(hateList) do
+                if holder and holder.Parent then
+                    local glitch = holder:FindFirstChild("Glitch")
+                    local label = holder:FindFirstChild("Label")
+                    if glitch and label and math.random() < 0.3 then
+                        glitch.Text = label.Text
+                        glitch.TextTransparency = math.random(20, 50) / 100
+                        glitch.Position = UDim2.new(math.random(-5, 5) / 100, 0, math.random(-5, 5) / 100, 0)
+                        task.spawn(function()
+                            task.wait(math.random(5, 15) / 100)
+                            if glitch and glitch.Parent then
+                                glitch.TextTransparency = 1
+                            end
+                        end)
+                    end
+                end
+            end
+            RunService.RenderStepped:Wait()
+        end
+    end)
+end
+
+local function stopHateGlitch()
+    hateGlitchActive = false
+    if hateGlitchThread then
+        task.cancel(hateGlitchThread)
+        hateGlitchThread = nil
+    end
+end
+
+local hateTeleportThread = nil
+local hateTeleportActive = false
+
+local function startHateTeleport()
+    hateTeleportActive = true
+    if hateTeleportThread then task.cancel(hateTeleportThread) end
+    hateTeleportThread = task.spawn(function()
+        while hateTeleportActive do
+            for _, holder in ipairs(hateList) do
+                if holder and holder.Parent then
+                    local newX = math.random(5, 95) / 100
+                    local newY = math.random(5, 95) / 100
+                    local tw = TweenService:Create(holder, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {
+                        Position = UDim2.new(newX, 0, newY, 0),
+                        Rotation = math.random(-35, 35),
+                    })
+                    tw:Play()
+                end
+            end
+            task.wait(0.8)
+        end
+    end)
+end
+
+local function stopHateTeleport()
+    hateTeleportActive = false
+    if hateTeleportThread then
+        task.cancel(hateTeleportThread)
+        hateTeleportThread = nil
+    end
+end
+
+local hatePhraseThread = nil
+local hatePhraseActive = false
+
+local function startHatePhrases()
+    hatePhraseActive = true
+    if hatePhraseThread then task.cancel(hatePhraseThread) end
+    hatePhraseThread = task.spawn(function()
+        while hatePhraseActive do
+            task.wait(math.random(2, 4))
+            if not hatePhraseActive then break end
+            local phrase = hatePhrases[math.random(1, #hatePhrases)]
+
+            for _, holder in ipairs(hateList) do
+                if holder and holder.Parent then
+                    local label = holder:FindFirstChild("Label")
+                    local glitch = holder:FindFirstChild("Glitch")
+                    if label then
+                        label.Text = phrase
+                        if phrase == "WHY!?" then
+                            label.TextColor3 = Color3.fromRGB(255, 100, 100)
+                        elseif phrase == "STOP!" then
+                            label.TextColor3 = Color3.fromRGB(255, 200, 0)
+                        elseif phrase == "NOOOO!" then
+                            label.TextColor3 = Color3.fromRGB(255, 0, 0)
+                        else
+                            label.TextColor3 = WHITE
+                        end
+                    end
+                    if glitch then
+                        glitch.Text = phrase
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function stopHatePhrases()
+    hatePhraseActive = false
+    if hatePhraseThread then
+        task.cancel(hatePhraseThread)
+        hatePhraseThread = nil
+    end
+end
+
+local hpGui = Instance.new("ScreenGui")
+hpGui.Name = "HPGui"
+hpGui.ResetOnSpawn = false
+hpGui.IgnoreGuiInset = true
+hpGui.DisplayOrder = 100001
+hpGui.Parent = playerGui
+
+local hpFrame = Instance.new("Frame")
+hpFrame.Name = "HPFrame"
+hpFrame.Size = UDim2.new(0, 320, 0, 50)
+hpFrame.AnchorPoint = Vector2.new(0.5, 0)
+hpFrame.Position = UDim2.new(0.5, 0, 0.02, 0)
+hpFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+hpFrame.BackgroundTransparency = 0.3
+hpFrame.BorderSizePixel = 0
+hpFrame.Visible = false
+hpFrame.ZIndex = 10
+hpFrame.Parent = hpGui
+
+local hpFrameCorner = Instance.new("UICorner")
+hpFrameCorner.CornerRadius = UDim.new(0, 10)
+hpFrameCorner.Parent = hpFrame
+
+local hpFrameStroke = Instance.new("UIStroke")
+hpFrameStroke.Color = WHITE
+hpFrameStroke.Thickness = 2
+hpFrameStroke.Parent = hpFrame
+
+local hpBarBg = Instance.new("Frame")
+hpBarBg.Name = "HPBarBg"
+hpBarBg.Size = UDim2.new(1, -20, 1, -20)
+hpBarBg.Position = UDim2.new(0, 10, 0, 10)
+hpBarBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+hpBarBg.BorderSizePixel = 0
+hpBarBg.ZIndex = 11
+hpBarBg.Parent = hpFrame
+
+local hpBarBgCorner = Instance.new("UICorner")
+hpBarBgCorner.CornerRadius = UDim.new(0, 6)
+hpBarBgCorner.Parent = hpBarBg
+
+local hpBarFill = Instance.new("Frame")
+hpBarFill.Name = "HPBarFill"
+hpBarFill.Size = UDim2.new(1, 0, 1, 0)
+hpBarFill.BackgroundColor3 = GREEN
+hpBarFill.BorderSizePixel = 0
+hpBarFill.ZIndex = 12
+hpBarFill.Parent = hpBarBg
+
+local hpBarFillCorner = Instance.new("UICorner")
+hpBarFillCorner.CornerRadius = UDim.new(0, 6)
+hpBarFillCorner.Parent = hpBarFill
+
+local hpLabel = Instance.new("TextLabel")
+hpLabel.Name = "HPLabel"
+hpLabel.Size = UDim2.new(1, 0, 1, 0)
+hpLabel.BackgroundTransparency = 1
+hpLabel.Text = "HP: 100 / 100"
+hpLabel.TextColor3 = WHITE
+hpLabel.Font = Enum.Font.GothamBold
+hpLabel.TextSize = 22
+hpLabel.TextStrokeTransparency = 0.3
+hpLabel.TextStrokeColor3 = BLACK
+hpLabel.ZIndex = 13
+hpLabel.Parent = hpBarBg
+
+local hpDeathSoundPlaying = false
+
+local function updateHP()
+    local pct = math.clamp(playerHP / maxHP, 0, 1)
+    local t = TweenService:Create(hpBarFill, TweenInfo.new(0.3), {Size = UDim2.new(pct, 0, 1, 0)})
+    t:Play()
+
+    if pct > 0.5 then
+        hpBarFill.BackgroundColor3 = GREEN
+    elseif pct > 0.25 then
+        hpBarFill.BackgroundColor3 = YELLOW
+    else
+        hpBarFill.BackgroundColor3 = RED
+    end
+
+    hpLabel.Text = "HP: " .. math.max(0, playerHP) .. " / " .. maxHP
+end
+
+local function damageHP(amount)
+    if playerHP <= 0 then return end
+    playerHP = playerHP - amount
+    updateHP()
+
+    if playerHP <= 0 and not hpDeathSoundPlaying then
+        hpDeathSoundPlaying = true
+        task.spawn(function()
+
+            local deathSound = playSound(SOUND_LOSE_BATTLE, 3, false)
+
+            local ended = false
+            local endConn
+            if deathSound then
+                endConn = deathSound.Ended:Connect(function()
+                    ended = true
+                    if endConn then endConn:Disconnect() end
+                end)
+            end
+
+            local t0 = os.clock()
+            while not ended and os.clock() - t0 < 10 do
+                task.wait(0.1)
+            end
+
+            task.wait(0.3)
+            player:Kick("You lose from A-90 Uninstall's battle")
+        end)
+    end
+end
+
+local function healHP(amount)
+    playerHP = math.min(maxHP, playerHP + amount)
+    updateHP()
+end
+
+local heartGameGui = Instance.new("ScreenGui")
+heartGameGui.Name = "HeartGameGui"
+heartGameGui.ResetOnSpawn = false
+heartGameGui.IgnoreGuiInset = true
+heartGameGui.DisplayOrder = 100000
+heartGameGui.Parent = playerGui
+
+local heartContainer = Instance.new("Frame")
+heartContainer.Name = "HeartContainer"
+heartContainer.Size = UDim2.new(0, 900, 0, 320)
+heartContainer.AnchorPoint = Vector2.new(0.5, 1)
+heartContainer.Position = UDim2.new(0.5, 0, 1, -20)
+heartContainer.BackgroundTransparency = 1
+heartContainer.Visible = false
+heartContainer.ZIndex = 10
+heartContainer.Parent = heartGameGui
+
+local heartGridBg = Instance.new("Frame")
+heartGridBg.Name = "GridBg"
+heartGridBg.Size = UDim2.new(1, 0, 1, 0)
+heartGridBg.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+heartGridBg.BackgroundTransparency = 0.4
+heartGridBg.BorderSizePixel = 0
+heartGridBg.ZIndex = 9
+heartGridBg.Parent = heartContainer
+
+local heartGridBgCorner = Instance.new("UICorner")
+heartGridBgCorner.CornerRadius = UDim.new(0, 16)
+heartGridBgCorner.Parent = heartGridBg
+
+local heartGridStroke = Instance.new("UIStroke")
+heartGridStroke.Color = Color3.fromRGB(60, 60, 120)
+heartGridStroke.Thickness = 2
+heartGridStroke.Transparency = 0.3
+heartGridStroke.Parent = heartGridBg
+
+local gridLines = {}
+local GRID_COLS = 18
+local GRID_ROWS = 6
+
+for i = 1, GRID_COLS - 1 do
+    local line = Instance.new("Frame")
+    line.Name = "GridV_" .. i
+    line.Size = UDim2.new(0, 1, 1, 0)
+    line.Position = UDim2.new(i / GRID_COLS, 0, 0, 0)
+    line.BackgroundColor3 = Color3.fromRGB(60, 60, 120)
+    line.BackgroundTransparency = 0.7
+    line.BorderSizePixel = 0
+    line.ZIndex = 10
+    line.Parent = heartContainer
+    table.insert(gridLines, line)
+end
+
+for i = 1, GRID_ROWS - 1 do
+    local line = Instance.new("Frame")
+    line.Name = "GridH_" .. i
+    line.Size = UDim2.new(1, 0, 0, 1)
+    line.Position = UDim2.new(0, 0, i / GRID_ROWS, 0)
+    line.BackgroundColor3 = Color3.fromRGB(60, 60, 120)
+    line.BackgroundTransparency = 0.7
+    line.BorderSizePixel = 0
+    line.ZIndex = 10
+    line.Parent = heartContainer
+    table.insert(gridLines, line)
+end
+
+local gridPulseThread = nil
+local gridPulseActive = false
+
+local function startGridPulse()
+    gridPulseActive = true
+    if gridPulseThread then task.cancel(gridPulseThread) end
+    gridPulseThread = task.spawn(function()
+        while gridPulseActive do
+            for _, line in ipairs(gridLines) do
+                if line and line.Parent then
+                    line.BackgroundTransparency = math.random(60, 85) / 100
+                end
+            end
+            RunService.RenderStepped:Wait()
+        end
+    end)
+end
+
+local function stopGridPulse()
+    gridPulseActive = false
+    if gridPulseThread then
+        task.cancel(gridPulseThread)
+        gridPulseThread = nil
+    end
+end
+
+local hitZone = Instance.new("Frame")
+hitZone.Name = "HitZone"
+hitZone.Size = UDim2.new(0, 300, 0, 300)
+hitZone.AnchorPoint = Vector2.new(0.5, 0.5)
+hitZone.Position = UDim2.new(0.5, 0, 0.5, 0)
+hitZone.BackgroundColor3 = WHITE
+hitZone.BackgroundTransparency = 0.94
+hitZone.BorderSizePixel = 0
+hitZone.ZIndex = 11
+hitZone.Parent = heartContainer
+
+local hitZoneCorner = Instance.new("UICorner")
+hitZoneCorner.CornerRadius = UDim.new(1, 0)
+hitZoneCorner.Parent = hitZone
+
+local hitZoneStroke = Instance.new("UIStroke")
+hitZoneStroke.Color = WHITE
+hitZoneStroke.Thickness = 3
+hitZoneStroke.Transparency = 0.5
+hitZoneStroke.Parent = hitZone
+
+local damageZone = Instance.new("Frame")
+damageZone.Name = "DamageZone"
+damageZone.Size = UDim2.new(0, 170, 0, 170)
+damageZone.AnchorPoint = Vector2.new(0.5, 0.5)
+damageZone.Position = UDim2.new(0.5, 0, 0.5, 0)
+damageZone.BackgroundColor3 = RED
+damageZone.BackgroundTransparency = 0.92
+damageZone.BorderSizePixel = 0
+damageZone.ZIndex = 11
+damageZone.Parent = heartContainer
+
+local damageZoneCorner = Instance.new("UICorner")
+damageZoneCorner.CornerRadius = UDim.new(1, 0)
+damageZoneCorner.Parent = damageZone
+
+local centerHeart = Instance.new("TextLabel")
+centerHeart.Name = "CenterHeart"
+centerHeart.Size = UDim2.new(0, 180, 0, 180)
+centerHeart.AnchorPoint = Vector2.new(0.5, 0.5)
+centerHeart.Position = UDim2.new(0.5, 0, 0.5, 0)
+centerHeart.BackgroundTransparency = 1
+centerHeart.Text = "♥"
+centerHeart.TextColor3 = WHITE
+centerHeart.TextScaled = true
+centerHeart.Font = Enum.Font.GothamBold
+centerHeart.ZIndex = 15
+centerHeart.Parent = heartContainer
+
+local instructionsLabel = Instance.new("TextLabel")
+instructionsLabel.Name = "Instructions"
+instructionsLabel.Size = UDim2.new(0, 800, 0, 40)
+instructionsLabel.AnchorPoint = Vector2.new(0.5, 1)
+instructionsLabel.Position = UDim2.new(0.5, 0, 1, 0)
+instructionsLabel.BackgroundTransparency = 1
+instructionsLabel.Text = "[E] BLUE Heart (right) | [Q] PINK Heart (left)"
+instructionsLabel.TextColor3 = WHITE
+instructionsLabel.Font = Enum.Font.GothamBold
+instructionsLabel.TextSize = 22
+instructionsLabel.TextStrokeTransparency = 0.3
+instructionsLabel.TextStrokeColor3 = BLACK
+instructionsLabel.ZIndex = 15
+instructionsLabel.Parent = heartContainer
+
+local activeHearts = {}
+local heartGameActive = false
+local heartGameThread = nil
+
+local function hasHeartOnSide(side)
+    for _, h in ipairs(activeHearts) do
+        if h.side == side and not h.resolved and h.frame and h.frame.Parent then
+            return true
+        end
+    end
+    return false
+end
+
+local function spawnHeart(side)
+    if not heartGameActive then return end
+
+    local isLeft = (side == "left")
+    local heartColor = isLeft and PINK or BLUE
+    local heartColorDark = isLeft and PINK_DK or BLUE_DK
+
+    local heartFrame = Instance.new("Frame")
+    heartFrame.Name = "Heart_" .. side
+    heartFrame.Size = UDim2.new(0, 140, 0, 140)
+    heartFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    heartFrame.BackgroundTransparency = 1
+    heartFrame.ZIndex = 13
+    heartFrame.Parent = heartContainer
+
+    local heartShadow = Instance.new("TextLabel")
+    heartShadow.Name = "HeartShadow"
+    heartShadow.Size = UDim2.new(1, 0, 1, 0)
+    heartShadow.Position = UDim2.new(0, 3, 0, 3)
+    heartShadow.BackgroundTransparency = 1
+    heartShadow.Text = "♥"
+    heartShadow.TextColor3 = BLACK
+    heartShadow.TextTransparency = 0.4
+    heartShadow.TextScaled = true
+    heartShadow.Font = Enum.Font.GothamBold
+    heartShadow.ZIndex = 12
+    heartShadow.Parent = heartFrame
+
+    local heartText = Instance.new("TextLabel")
+    heartText.Name = "HeartText"
+    heartText.Size = UDim2.new(1, 0, 1, 0)
+    heartText.BackgroundTransparency = 1
+    heartText.Text = "♥"
+    heartText.TextColor3 = heartColor
+    heartText.TextScaled = true
+    heartText.Font = Enum.Font.GothamBold
+    heartText.ZIndex = 13
+    heartText.Parent = heartFrame
+
+    local heartGlow = Instance.new("TextLabel")
+    heartGlow.Name = "Glow"
+    heartGlow.Size = UDim2.new(1.2, 0, 1.2, 0)
+    heartGlow.AnchorPoint = Vector2.new(0.5, 0.5)
+    heartGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
+    heartGlow.BackgroundTransparency = 1
+    heartGlow.Text = "♥"
+    heartGlow.TextColor3 = heartColorDark
+    heartGlow.TextTransparency = 0.7
+    heartGlow.TextScaled = true
+    heartGlow.Font = Enum.Font.GothamBold
+    heartGlow.ZIndex = 11
+    heartGlow.Parent = heartFrame
+
+    local startX, endX
+    if isLeft then
+        startX = -0.15
+        endX = 0.38
+    else
+        startX = 1.15
+        endX = 0.62
+    end
+
+    heartFrame.Position = UDim2.new(startX, 0, 0.5, 0)
+
+    local heartData = {
+        frame = heartFrame,
+        side = side,
+        resolved = false,
+    }
+    table.insert(activeHearts, heartData)
+
+    local duration = 3.0
+    local tween = TweenService:Create(heartFrame, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
+        Position = UDim2.new(endX, 0, 0.5, 0)
+    })
+    tween:Play()
+
+    tween.Completed:Connect(function()
+        if heartData.resolved then return end
+        heartData.resolved = true
+
+        local heartX = heartFrame.Position.X.Scale
+        local distFromCenter = math.abs(heartX - 0.5)
+
+        if distFromCenter < 0.08 then
+            damageHP(10)
+            playSound(SOUND_HEART_WRONG, 1.2, false)
+        end
+
+        if heartFrame and heartFrame.Parent then
+            task.spawn(function()
+                local f = heartFrame
+                local origPos = f.Position
+                local startT = os.clock()
+                while os.clock() - startT < 0.3 and f and f.Parent do
+                    local dx = math.random(-8, 8)
+                    local dy = math.random(-8, 8)
+                    f.Position = UDim2.new(origPos.X.Scale, dx, origPos.Y.Scale, dy)
+                    RunService.RenderStepped:Wait()
+                end
+                if f and f.Parent then
+                    f.Position = origPos
+                    f:Destroy()
+                end
+            end)
+        end
+
+        for i, h in ipairs(activeHearts) do
+            if h == heartData then
+                table.remove(activeHearts, i)
+                break
+            end
+        end
+    end)
+end
+
+local function checkHeartInput(key)
+    if not heartGameActive then return end
+
+    local expectedSide = (key == Enum.KeyCode.E) and "right" or "left"
+
+    local closestHeart = nil
+    local closestDist = math.huge
+
+    for _, h in ipairs(activeHearts) do
+        if not h.resolved and h.frame and h.frame.Parent then
+            if h.side == expectedSide then
+                local pos = h.frame.Position.X.Scale
+                local dist = math.abs(pos - 0.5)
+                if dist < closestDist then
+                    closestDist = dist
+                    closestHeart = h
+                end
+            end
+        end
+    end
+
+    if closestHeart and closestDist < 0.18 then
+        closestHeart.resolved = true
+        local heartText = closestHeart.frame:FindFirstChild("HeartText")
+        if heartText then heartText.TextColor3 = GREEN end
+        playSound(SOUND_HEART_CORRECT, 1.5, false)
+        healHP(5)
+
+        local f = closestHeart.frame
+        task.spawn(function()
+            local origPos = f.Position
+            local startT = os.clock()
+            while os.clock() - startT < 0.35 and f and f.Parent do
+                local dx = math.random(-10, 10)
+                local dy = math.random(-10, 10)
+                f.Position = UDim2.new(origPos.X.Scale, dx, origPos.Y.Scale, dy)
+                RunService.RenderStepped:Wait()
+            end
+            if f and f.Parent then
+                f.Position = origPos
+                for _, lbl in ipairs(f:GetDescendants()) do
+                    if lbl:IsA("TextLabel") then
+                        local ct = TweenService:Create(lbl, TweenInfo.new(0.3), {TextTransparency = 1})
+                        ct:Play()
+                    end
+                end
+                task.wait(0.35)
+                if f and f.Parent then f:Destroy() end
+            end
+        end)
+
+        for i, h in ipairs(activeHearts) do
+            if h == closestHeart then
+                table.remove(activeHearts, i)
+                break
+            end
+        end
+    else
+        damageHP(10)
+        playSound(SOUND_HEART_WRONG, 1.2, false)
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if not heartGameActive then return end
+
+    if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.Q then
+        checkHeartInput(input.KeyCode)
+    end
+end)
+
+local function startHeartGame()
+    heartGameActive = true
+    heartContainer.Visible = true
+
+    for _, h in ipairs(activeHearts) do
+        if h.frame and h.frame.Parent then h.frame:Destroy() end
+    end
+    activeHearts = {}
+
+    startGridPulse()
+
+    local startTime = os.clock()
+    local duration = 30
+
+    if heartGameThread then task.cancel(heartGameThread) end
+    heartGameThread = task.spawn(function()
+        while heartGameActive and (os.clock() - startTime) < duration do
+            local availableSides = {}
+            if not hasHeartOnSide("left") then table.insert(availableSides, "left") end
+            if not hasHeartOnSide("right") then table.insert(availableSides, "right") end
+
+            if #availableSides > 0 then
+                local side = availableSides[math.random(1, #availableSides)]
+                spawnHeart(side)
+            end
+
+            task.wait(math.random(7, 13) / 10)
+        end
+        heartGameActive = false
+        heartContainer.Visible = false
+        stopGridPulse()
+        for _, h in ipairs(activeHearts) do
+            if h.frame and h.frame.Parent then h.frame:Destroy() end
+        end
+        activeHearts = {}
+    end)
+end
+
+local function stopHeartGame()
+    heartGameActive = false
+    if heartGameThread then
+        task.cancel(heartGameThread)
+        heartGameThread = nil
+    end
+    heartContainer.Visible = false
+    stopGridPulse()
+    for _, h in ipairs(activeHearts) do
+        if h.frame and h.frame.Parent then h.frame:Destroy() end
+    end
+    activeHearts = {}
+end
+
+local mouseGameGui = Instance.new("ScreenGui")
+mouseGameGui.Name = "MouseGameGui"
+mouseGameGui.ResetOnSpawn = false
+mouseGameGui.IgnoreGuiInset = true
+mouseGameGui.DisplayOrder = 100002
+mouseGameGui.Parent = playerGui
+
+local mouseGameContainer = Instance.new("Frame")
+mouseGameContainer.Name = "MouseGameContainer"
+mouseGameContainer.Size = UDim2.new(1, 0, 1, 0)
+mouseGameContainer.BackgroundTransparency = 1
+mouseGameContainer.Visible = false
+mouseGameContainer.ZIndex = 10
+mouseGameContainer.Parent = mouseGameGui
+
+local mouseCheckOverlay = Instance.new("Frame")
+mouseCheckOverlay.Name = "CheckOverlay"
+mouseCheckOverlay.Size = UDim2.new(1, 0, 1, 0)
+mouseCheckOverlay.BackgroundColor3 = RED
+mouseCheckOverlay.BackgroundTransparency = 1
+mouseCheckOverlay.BorderSizePixel = 0
+mouseCheckOverlay.ZIndex = 100
+mouseCheckOverlay.Parent = mouseGameGui
+
+local mouseYellowFlash = Instance.new("Frame")
+mouseYellowFlash.Name = "YellowFlash"
+mouseYellowFlash.Size = UDim2.new(1, 0, 1, 0)
+mouseYellowFlash.BackgroundColor3 = YELLOW
+mouseYellowFlash.BackgroundTransparency = 1
+mouseYellowFlash.BorderSizePixel = 0
+mouseYellowFlash.ZIndex = 101
+mouseYellowFlash.Parent = mouseGameGui
+
+local mouseIndicator = Instance.new("TextLabel")
+mouseIndicator.Name = "MouseIndicator"
+mouseIndicator.Size = UDim2.new(0, 400, 0, 50)
+mouseIndicator.AnchorPoint = Vector2.new(0.5, 1)
+mouseIndicator.Position = UDim2.new(0.5, 0, 0.95, 0)
+mouseIndicator.BackgroundTransparency = 1
+mouseIndicator.Text = "HOVER YOUR MOUSE OVER THE SQUARES!"
+mouseIndicator.TextColor3 = YELLOW
+mouseIndicator.Font = Enum.Font.GothamBold
+mouseIndicator.TextSize = 28
+mouseIndicator.TextStrokeTransparency = 0
+mouseIndicator.TextStrokeColor3 = BLACK
+mouseIndicator.ZIndex = 102
+mouseIndicator.Visible = false
+mouseIndicator.Parent = mouseGameGui
+
+local mouseGameActive = false
+local mouseGameThread = nil
+local activeSquares = {}
+
+local function spawnMouseSquare()
+    if not mouseGameActive then return end
+
+    local size = math.random(100, 140)
+    local sq = Instance.new("Frame")
+    sq.Name = "MouseSquare"
+    sq.Size = UDim2.new(0, size, 0, size)
+    sq.Position = UDim2.new(
+        math.random(5, 85) / 100,
+        0,
+        math.random(10, 80) / 100,
+        0
+    )
+    sq.BackgroundColor3 = RED
+    sq.BackgroundTransparency = 0.2
+    sq.BorderSizePixel = 0
+    sq.ZIndex = 50
+    sq.Parent = mouseGameContainer
+
+    local sqCorner = Instance.new("UICorner")
+    sqCorner.CornerRadius = UDim.new(0, 8)
+    sqCorner.Parent = sq
+
+    local sqStroke = Instance.new("UIStroke")
+    sqStroke.Color = WHITE
+    sqStroke.Thickness = 3
+    sqStroke.Parent = sq
+
+    local sqStatic = Instance.new("ImageLabel")
+    sqStatic.Name = "Static"
+    sqStatic.Size = UDim2.new(1, 0, 1, 0)
+    sqStatic.BackgroundTransparency = 1
+    sqStatic.Image = STATIC_TEXTURE
+    sqStatic.ImageColor3 = RED
+    sqStatic.ImageTransparency = 0.4
+    sqStatic.ScaleType = Enum.ScaleType.Tile
+    sqStatic.TileSize = UDim2.new(0, 30, 0, 30)
+    sqStatic.ZIndex = 51
+    sqStatic.Parent = sq
+
+    table.insert(activeSquares, sq)
+    return sq
+end
+
+local function clearMouseSquares()
+    for _, sq in ipairs(activeSquares) do
+        if sq and sq.Parent then sq:Destroy() end
+    end
+    activeSquares = {}
+end
+
+local function startMouseGame()
+    mouseGameActive = true
+    mouseGameContainer.Visible = true
+    mouseIndicator.Visible = true
+    clearMouseSquares()
+
+    if mouseGameThread then task.cancel(mouseGameThread) end
+    mouseGameThread = task.spawn(function()
+        while mouseGameActive do
+            local count = math.random(3, 5)
+            clearMouseSquares()
+            for i = 1, count do
+                spawnMouseSquare()
+            end
+
+            mouseIndicator.Text = "HOVER YOUR MOUSE OVER THE SQUARES!"
+            mouseIndicator.TextColor3 = YELLOW
+
+            task.wait(3)
+            if not mouseGameActive then break end
+
+            mouseIndicator.Text = "GET READY..."
+            mouseIndicator.TextColor3 = Color3.fromRGB(255, 150, 0)
+            task.spawn(function()
+                local t0 = os.clock()
+                while os.clock() - t0 < 2 and mouseGameActive do
+                    mouseCheckOverlay.BackgroundTransparency = math.random(0, 30) / 100
+                    task.wait(0.05)
+                end
+                mouseCheckOverlay.BackgroundTransparency = 1
+            end)
+            task.wait(2)
+
+            if not mouseGameActive then break end
+
+            mouseIndicator.Text = "NOW!"
+            mouseIndicator.TextColor3 = Color3.fromRGB(255, 255, 0)
+            playSound(SOUND_MOUSE_CHECK, 2, false)
+
+            mouseYellowFlash.BackgroundTransparency = 0
+            task.wait(0.15)
+            mouseYellowFlash.BackgroundTransparency = 1
+
+            task.wait(0.05)
+
+            local mousePos = UserInputService:GetMouseLocation()
+            local isInside = false
+
+            for _, sq in ipairs(activeSquares) do
+                if sq and sq.Parent then
+                    local pos = sq.AbsolutePosition
+                    local size2 = sq.AbsoluteSize
+                    if mousePos.X >= pos.X and mousePos.X <= pos.X + size2.X
+                        and mousePos.Y >= pos.Y and mousePos.Y <= pos.Y + size2.Y then
+                        isInside = true
+                        break
+                    end
+                end
+            end
+
+            if not isInside then
+                damageHP(100)
+                playSound(SOUND_HEART_WRONG, 2, false)
+                mouseIndicator.Text = "MISSED!"
+                mouseIndicator.TextColor3 = RED
+            else
+                for _, sq in ipairs(activeSquares) do
+                    if sq and sq.Parent then
+                        sq.BackgroundColor3 = GREEN
+                        sq.BackgroundTransparency = 0
+                    end
+                end
+                playSound(SOUND_HEART_CORRECT, 2, false)
+                healHP(5)
+                mouseIndicator.Text = "GOT IT!"
+                mouseIndicator.TextColor3 = GREEN
+            end
+
+            task.wait(1)
+            clearMouseSquares()
+            task.wait(0.5)
+        end
+        clearMouseSquares()
+        mouseGameContainer.Visible = false
+        mouseIndicator.Visible = false
+    end)
+end
+
+local function stopMouseGame()
+    mouseGameActive = false
+    if mouseGameThread then
+        task.cancel(mouseGameThread)
+        mouseGameThread = nil
+    end
+    clearMouseSquares()
+    mouseGameContainer.Visible = false
+    mouseIndicator.Visible = false
+    mouseCheckOverlay.BackgroundTransparency = 1
+    mouseYellowFlash.BackgroundTransparency = 1
+end
+
+local a90Active = true
+
+local function runA90Script()
+    task.spawn(function()
+        local Player3    = Players.LocalPlayer
+        local PlayerGui3 = Player3:WaitForChild("PlayerGui")
+
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "A90Jumpscare"
+        gui.IgnoreGuiInset = true
+        gui.ResetOnSpawn = false
+        gui.DisplayOrder = 999999
+        gui.Parent = PlayerGui3
+
+        local face = Instance.new("ImageLabel")
+        face.Name = "A90Face"
+        face.BackgroundTransparency = 1
+        face.AnchorPoint = Vector2.new(0.5, 0.5)
+        face.Size = UDim2.fromOffset(240, 240)
+        face.Position = UDim2.fromScale(0.5, 0.5)
+        face.Image = IMG_NORMAL
+        face.ImageColor3 = WHITE
+        face.Visible = false
+        face.ZIndex = 20
+        face.Parent = gui
+
+        local jumpscare = Instance.new("ImageLabel")
+        jumpscare.Name = "A90Jumpscare"
+        jumpscare.BackgroundTransparency = 1
+        jumpscare.AnchorPoint = Vector2.new(0.5, 0.5)
+        jumpscare.Size = UDim2.fromScale(1, 1)
+        jumpscare.Position = UDim2.fromScale(0.5, 0.5)
+        jumpscare.Image = IMG_JUMPSCARE
+        jumpscare.ImageColor3 = WHITE
+        jumpscare.Visible = false
+        jumpscare.ZIndex = 30
+        jumpscare.ScaleType = Enum.ScaleType.Fit
+        jumpscare.Parent = gui
+
+        local background = Instance.new("Frame")
+        background.Name = "FinalBackground"
+        background.Size = UDim2.fromScale(1, 1)
+        background.BorderSizePixel = 0
+        background.BackgroundColor3 = WHITE
+        background.Visible = false
+        background.ZIndex = 40
+        background.Parent = gui
+
+        local vignette = Instance.new("Frame")
+        vignette.Name = "FinalVignette"
+        vignette.Size = UDim2.fromScale(1, 1)
+        vignette.BorderSizePixel = 0
+        vignette.BackgroundColor3 = RED
+        vignette.BackgroundTransparency = 0.15
+        vignette.Visible = false
+        vignette.ZIndex = 50
+        vignette.Parent = gui
+
+        local vg = Instance.new("UIGradient")
+        vg.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.15),
+            NumberSequenceKeypoint.new(0.2, 0.4),
+            NumberSequenceKeypoint.new(0.5, 0.9),
+            NumberSequenceKeypoint.new(0.8, 0.4),
+            NumberSequenceKeypoint.new(1, 0.15)
+        })
+        vg.Parent = vignette
+
+        local staticPart, staticCarmine, staticBlack, staticConnection
+        local staticActive, staticAttack = false, false
+
+        local function createStaticPart()
+            if staticPart then staticPart:Destroy() end
+            local cam = workspace.CurrentCamera
+            if not cam then return end
+
+            staticPart = Instance.new("Part")
+            staticPart.Name = "A90Static"
+            staticPart.Anchored = true
+            staticPart.CanCollide = false
+            staticPart.CanTouch = false
+            staticPart.CanQuery = false
+            staticPart.CastShadow = false
+            staticPart.Material = Enum.Material.SmoothPlastic
+            staticPart.Transparency = 1
+            staticPart.Size = Vector3.new(20, 20, 0.05)
+            staticPart.Parent = workspace
+
+            staticCarmine = Instance.new("Texture")
+            staticCarmine.Name = "CarmineStatic"
+            staticCarmine.Texture = STATIC_TEXTURE
+            staticCarmine.Face = Enum.NormalId.Front
+            staticCarmine.Color3 = CARMINE
+            staticCarmine.Transparency = 0
+            staticCarmine.StudsPerTileU = 0.35
+            staticCarmine.StudsPerTileV = 0.35
+            staticCarmine.Parent = staticPart
+
+            staticBlack = Instance.new("Texture")
+            staticBlack.Name = "BlackStatic"
+            staticBlack.Texture = STATIC_TEXTURE
+            staticBlack.Face = Enum.NormalId.Front
+            staticBlack.Color3 = BLACK
+            staticBlack.Transparency = 0.35
+            staticBlack.StudsPerTileU = 0.35
+            staticBlack.StudsPerTileV = 0.35
+            staticBlack.Parent = staticPart
+
+            staticActive = true
+            staticAttack = false
+
+            if staticConnection then staticConnection:Disconnect() end
+            staticConnection = RunService.RenderStepped:Connect(function()
+                if not staticActive or not staticPart or not staticPart.Parent then return end
+                cam = workspace.CurrentCamera
+                if not cam then return end
+
+                local distance = 0.7
+                local viewport = cam.ViewportSize
+                local aspect = viewport.X / math.max(viewport.Y, 1)
+                local vs = 2 * distance * math.tan(math.rad(cam.FieldOfView * 0.5))
+                local hs = vs * aspect
+
+                staticPart.Size = Vector3.new(hs, vs, 0.05)
+                local cp = cam.CFrame.Position
+                local tp = cp + cam.CFrame.LookVector * distance
+                staticPart.CFrame = CFrame.lookAt(tp, cp)
+
+                staticCarmine.OffsetStudsU = math.random() * 2
+                staticCarmine.OffsetStudsV = math.random() * 2
+                staticBlack.OffsetStudsU = math.random() * 2
+                staticBlack.OffsetStudsV = math.random() * 2
+
+                if staticAttack then
+                    staticCarmine.Color3 = RED
+                    staticBlack.Color3 = RED
+                    staticCarmine.Transparency = math.random(0, 10) / 100
+                    staticBlack.Transparency = math.random(10, 50) / 100
+                else
+                    staticCarmine.Color3 = CARMINE
+                    staticBlack.Color3 = BLACK
+                    staticCarmine.Transparency = 0
+                    staticBlack.Transparency = 0.35
+                end
+            end)
+        end
+
+        local function destroyStatic()
+            staticActive = false
+            if staticConnection then staticConnection:Disconnect() staticConnection = nil end
+            if staticPart then staticPart:Destroy() staticPart = nil end
+            staticCarmine = nil
+            staticBlack = nil
+        end
+
+        local function playerIsMoving()
+            local ch = Player3.Character
+            if not ch then return false end
+            local h = ch:FindFirstChildOfClass("Humanoid")
+            if h and h.MoveDirection.Magnitude > 0.05 then return true end
+            return false
+        end
+
+        local function damagePlayer()
+            local ch = Player3.Character
+            local h = ch and ch:FindFirstChildOfClass("Humanoid")
+            if h then pcall(function() h:TakeDamage(DAMAGE) end) end
+        end
+
+        local function attack()
+            staticAttack = true
+            if staticCarmine then staticCarmine.Color3 = RED end
+            if staticBlack then staticBlack.Color3 = RED end
+
+            playSound(SOUND_ATTACK, 1.5, false)
+            face.Image = IMG_GLITCH
+            face.ImageColor3 = WHITE
+            task.wait(0.4)
+            face.Visible = false
+            task.wait(0.2)
+            jumpscare.Visible = true
+
+            local t0 = os.clock()
+            while os.clock() - t0 < 1 do
+                jumpscare.Position = UDim2.fromScale(
+                    0.5 + math.random(-12, 12) / 1000,
+                    0.5 + math.random(-12, 12) / 1000
+                )
+                jumpscare.Rotation = math.random(-3, 3)
+                task.wait(0.025)
+            end
+
+            jumpscare.Position = UDim2.fromScale(0.5, 0.5)
+            jumpscare.Rotation = 0
+            jumpscare.Visible = false
+            destroyStatic()
+
+            background.Visible = true
+            background.BackgroundColor3 = WHITE
+            task.wait(0.2)
+            background.BackgroundColor3 = RED
+            task.wait(0.2)
+
+            local f = TweenService:Create(background, TweenInfo.new(0.7, Enum.EasingStyle.Linear), {BackgroundTransparency = 1})
+            f:Play()
+            f.Completed:Wait()
+            background.Visible = false
+
+            playSound(SOUND_DEATH, 1.5, false)
+            damagePlayer()
+
+            vignette.Visible = true
+            local vf = TweenService:Create(vignette, TweenInfo.new(15, Enum.EasingStyle.Linear), {BackgroundTransparency = 1})
+            vf:Play()
+            vf.Completed:Wait()
+            vignette.Visible = false
+        end
+
+        local function getCurrentTool()
+            local ch = Player3.Character
+            if not ch then return nil end
+            return ch:FindFirstChildOfClass("Tool")
+        end
+
+        local function toolChanged(initialTool)
+            local currentTool = getCurrentTool()
+            if initialTool == nil and currentTool ~= nil then return true end
+            if initialTool ~= nil and currentTool == nil then return true end
+            if initialTool ~= nil and currentTool ~= nil and initialTool ~= currentTool then return true end
+            return false
+        end
+
+        local function runA90()
+            gui.Enabled = true
+            face.Visible = false
+            jumpscare.Visible = false
+            background.Visible = false
+            vignette.Visible = false
+            face.ImageTransparency = 0
+            createStaticPart()
+
+            playSound(SOUND_APPEAR, 10, false)
+            if SOUND_APPEAR_LEAD_TIME > 0 then task.wait(SOUND_APPEAR_LEAD_TIME) end
+
+            face.Image = IMG_NORMAL
+            face.ImageColor3 = WHITE
+            face.Size = UDim2.fromOffset(240, 240)
+            face.Position = UDim2.fromScale(math.random(15, 85) / 100, math.random(15, 85) / 100)
+            face.Visible = true
+            task.wait(0.35)
+            face.Position = UDim2.fromScale(0.5, 0.5)
+
+            local ch = Player3.Character
+            local root = ch and ch:FindFirstChild("HumanoidRootPart")
+            local sp = root and root.Position
+
+            local moved = false
+            local ds = os.clock()
+
+            local initialMousePos = UserInputService:GetMouseLocation()
+            local initialTool = getCurrentTool()
+
+            local inputConnection = UserInputService.InputBegan:Connect(function(input, processed)
+                if processed then return end
+                if input.UserInputType == Enum.UserInputType.Keyboard then
+                    local k = input.KeyCode
+                    if k == Enum.KeyCode.W or k == Enum.KeyCode.A or k == Enum.KeyCode.S
+                        or k == Enum.KeyCode.D or k == Enum.KeyCode.Space
+                        or k == Enum.KeyCode.Up or k == Enum.KeyCode.Down
+                        or k == Enum.KeyCode.Left or k == Enum.KeyCode.Right then
+                        moved = true
+                    end
+                elseif input.UserInputType == Enum.UserInputType.Gamepad1
+                    or input.UserInputType == Enum.UserInputType.Touch then
+                    moved = true
+                end
+            end)
+
+            local mouseConnection = UserInputService.InputChanged:Connect(function(input, processed)
+                if processed then return end
+                if input.UserInputType == Enum.UserInputType.MouseMovement then
+                    local currentPos = Vector2.new(input.Position.X, input.Position.Y)
+                    if (currentPos - initialMousePos).Magnitude > 3 then
+                        moved = true
+                    end
+                end
+            end)
+
+            local toolAddedConnection = nil
+            local toolRemovedConnection = nil
+            if ch then
+                toolAddedConnection = ch.ChildAdded:Connect(function(child)
+                    if child:IsA("Tool") then moved = true end
+                end)
+                toolRemovedConnection = ch.ChildRemoved:Connect(function(child)
+                    if child:IsA("Tool") then moved = true end
+                end)
+            end
+
+            while os.clock() - ds < 1.1 and not moved do
+                if playerIsMoving() then moved = true break end
+                ch = Player3.Character
+                root = ch and ch:FindFirstChild("HumanoidRootPart")
+                if root and sp then
+                    if (root.Position - sp).Magnitude > 0.08 then moved = true break end
+                end
+
+                local currentMousePos = UserInputService:GetMouseLocation()
+                if (currentMousePos - initialMousePos).Magnitude > 3 then moved = true break end
+
+                if toolChanged(initialTool) then moved = true break end
+
+                task.wait()
+            end
+
+            inputConnection:Disconnect()
+            mouseConnection:Disconnect()
+            if toolAddedConnection then toolAddedConnection:Disconnect() end
+            if toolRemovedConnection then toolRemovedConnection:Disconnect() end
+
+            if moved then
+                if a90AttackEnabled then
+                    attack()
+                else
+                    destroyStatic()
+                    face.Visible = false
+                    gui.Enabled = false
+                end
+                return
+            end
+
+            local ff = TweenService:Create(face, TweenInfo.new(0.2, Enum.EasingStyle.Linear), {ImageTransparency = 1})
+            ff:Play()
+            ff.Completed:Wait()
+            face.ImageTransparency = 0
+            face.Visible = false
+            destroyStatic()
+        end
+
+        task.spawn(function()
+            task.wait(INITIAL_DELAY)
+            while a90Active and not a90SpawnerStop do
+                if uninstallMode and a90SpawnInterval then
+                    pcall(runA90)
+                    task.wait(a90SpawnInterval)
+                elseif ENABLE_RESPAWN then
+                    pcall(runA90)
+                    task.wait(math.random(MIN_INTERVAL, MAX_INTERVAL))
+                else
+                    pcall(runA90)
+                    break
+                end
+            end
+        end)
+    end)
+end
+
+local backgroundEventGui = Instance.new("ScreenGui")
+backgroundEventGui.Name = "BackgroundEventGui"
+backgroundEventGui.ResetOnSpawn = false
+backgroundEventGui.IgnoreGuiInset = true
+backgroundEventGui.DisplayOrder = 100003
+backgroundEventGui.Parent = playerGui
+
+local glitchImageContainer = Instance.new("Frame")
+glitchImageContainer.Name = "GlitchImageContainer"
+glitchImageContainer.Size = UDim2.new(1, 0, 1, 0)
+glitchImageContainer.BackgroundTransparency = 1
+glitchImageContainer.Visible = false
+glitchImageContainer.ZIndex = 10
+glitchImageContainer.Parent = backgroundEventGui
+
+local mouseGlitchGui = Instance.new("ScreenGui")
+mouseGlitchGui.Name = "MouseGlitchGui"
+mouseGlitchGui.ResetOnSpawn = false
+mouseGlitchGui.IgnoreGuiInset = true
+mouseGlitchGui.DisplayOrder = 100004
+mouseGlitchGui.Parent = playerGui
+
+local mouseGlitchFrame = Instance.new("ImageLabel")
+mouseGlitchFrame.Name = "MouseGlitch"
+mouseGlitchFrame.Size = UDim2.new(0, 60, 0, 60)
+mouseGlitchFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mouseGlitchFrame.BackgroundTransparency = 1
+mouseGlitchFrame.Image = IMG_GLITCH
+mouseGlitchFrame.ImageColor3 = WHITE
+mouseGlitchFrame.ImageTransparency = 1
+mouseGlitchFrame.ZIndex = 200
+mouseGlitchFrame.Parent = mouseGlitchGui
+
+local function eventColorSwap()
+    if not uninstallMode then return end
+    local cycles = math.random(3, 6)
+    for i = 1, cycles do
+        if not uninstallMode or uninstallCompleted then break end
+        downloadingBgColorOverride = {
+            bg = Color3.fromRGB(40, 0, 0),
+            static1 = Color3.fromRGB(150, 0, 0),
+            static2 = Color3.fromRGB(200, 0, 0),
+        }
+        task.wait(math.random(3, 6) / 10)
+        if not uninstallMode or uninstallCompleted then break end
+        downloadingBgColorOverride = {
+            bg = Color3.fromRGB(0, 40, 0),
+            static1 = Color3.fromRGB(0, 150, 0),
+            static2 = Color3.fromRGB(0, 200, 0),
+        }
+        task.wait(math.random(3, 6) / 10)
+    end
+    downloadingBgColorOverride = nil
+end
+
+local glitchImages = {}
+local function eventGlitchImages()
+    if not uninstallMode then return end
+    glitchImageContainer.Visible = true
+
+    local count = math.random(5, 12)
+    for i = 1, count do
+        if not uninstallMode or uninstallCompleted then break end
+
+        local img = Instance.new("ImageLabel")
+        img.Name = "GlitchImg_" .. i
+        img.Size = UDim2.new(0, math.random(80, 250), 0, math.random(80, 250))
+        img.Position = UDim2.new(math.random(0, 100) / 100, 0, math.random(0, 100) / 100, 0)
+        img.AnchorPoint = Vector2.new(0.5, 0.5)
+        img.BackgroundTransparency = 1
+        img.Image = IMG_GLITCH
+        img.ImageColor3 = math.random() < 0.5 and WHITE or Color3.fromRGB(255, 200, 200)
+        img.ImageTransparency = math.random(30, 70) / 100
+        img.Rotation = math.random(-30, 30)
+        img.ZIndex = 10
+        img.Parent = glitchImageContainer
+
+        table.insert(glitchImages, img)
+
+        task.spawn(function()
+            task.wait(math.random(10, 30) / 10)
+            if img and img.Parent then
+                img:Destroy()
+            end
+        end)
+    end
+
+    task.wait(math.random(15, 30) / 10)
+
+    for _, img in ipairs(glitchImages) do
+        if img and img.Parent then img:Destroy() end
+    end
+    glitchImages = {}
+    if uninstallMode and not uninstallCompleted then
+        glitchImageContainer.Visible = false
+    end
+end
+
+local function eventRandomSounds()
+    if not uninstallMode then return end
+    local count = math.random(3, 8)
+    for i = 1, count do
+        if not uninstallMode or uninstallCompleted then break end
+        playSound(SOUND_EVENT_RANDOM, math.random(15, 35) / 10, false)
+        task.wait(math.random(5, 15) / 10)
+    end
+end
+
+local function eventMouseGlitch()
+    if not uninstallMode then return end
+    local duration = math.random(15, 35) / 10
+    local startT = os.clock()
+    local colors = {
+        Color3.fromRGB(0, 255, 255),
+        Color3.fromRGB(255, 0, 255),
+        WHITE,
+        Color3.fromRGB(255, 255, 0),
+    }
+
+    while os.clock() - startT < duration and uninstallMode and not uninstallCompleted do
+        local mousePos = UserInputService:GetMouseLocation()
+        local offsetX = math.random(-30, 30)
+        local offsetY = math.random(-30, 30)
+
+        mouseGlitchFrame.Position = UDim2.new(0, mousePos.X + offsetX, 0, mousePos.Y + offsetY)
+        mouseGlitchFrame.ImageTransparency = math.random(20, 60) / 100
+        mouseGlitchFrame.ImageColor3 = colors[math.random(1, #colors)]
+        mouseGlitchFrame.Rotation = math.random(-45, 45)
+        mouseGlitchFrame.Size = UDim2.new(0, math.random(30, 100), 0, math.random(30, 100))
+
+        RunService.RenderStepped:Wait()
+    end
+
+    mouseGlitchFrame.ImageTransparency = 1
+end
+
+local function startBackgroundEvents()
+    backgroundEventsActive = true
+    if backgroundEventsThread then task.cancel(backgroundEventsThread) end
+
+    backgroundEventsThread = task.spawn(function()
+        task.wait(math.random(5, 15))
+
+        while backgroundEventsActive and uninstallMode and not uninstallCompleted do
+            local eventType = math.random(1, 4)
+
+            if eventType == 1 then
+                pcall(eventColorSwap)
+            elseif eventType == 2 then
+                pcall(eventGlitchImages)
+            elseif eventType == 3 then
+                pcall(eventRandomSounds)
+            elseif eventType == 4 then
+                pcall(eventMouseGlitch)
+            end
+
+            task.wait(math.random(5, 12))
+        end
+    end)
+end
+
+local function stopBackgroundEvents()
+    backgroundEventsActive = false
+    if backgroundEventsThread then
+        task.cancel(backgroundEventsThread)
+        backgroundEventsThread = nil
+    end
+    downloadingBgColorOverride = nil
+    glitchImageContainer.Visible = false
+    for _, img in ipairs(glitchImages) do
+        if img and img.Parent then img:Destroy() end
+    end
+    glitchImages = {}
+    mouseGlitchFrame.ImageTransparency = 1
+end
+
+local uninstallBoostBtn = Instance.new("TextButton")
+uninstallBoostBtn.Name = "UninstallBoostButton"
+uninstallBoostBtn.Size = UDim2.new(0, 280, 0, 80)
+uninstallBoostBtn.Position = UDim2.new(0.5, -140, 0.85, 0)
+uninstallBoostBtn.BackgroundColor3 = YELLOW
+uninstallBoostBtn.BorderSizePixel = 0
+uninstallBoostBtn.Text = "Uninstall Boost"
+uninstallBoostBtn.TextColor3 = BLACK
+uninstallBoostBtn.Font = Enum.Font.GothamBold
+uninstallBoostBtn.TextSize = 30
+uninstallBoostBtn.TextStrokeTransparency = 1
+uninstallBoostBtn.AutoButtonColor = false
+uninstallBoostBtn.Visible = false
+uninstallBoostBtn.ZIndex = 200
+uninstallBoostBtn.Parent = screenGui
+
+local ubCorner = Instance.new("UICorner")
+ubCorner.CornerRadius = UDim.new(0, 14)
+ubCorner.Parent = uninstallBoostBtn
+
+local ubGradient = Instance.new("UIGradient")
+ubGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 100)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 180, 0)),
+})
+ubGradient.Rotation = 90
+ubGradient.Parent = uninstallBoostBtn
+
+local ubStaticBg = Instance.new("ImageLabel")
+ubStaticBg.Name = "YellowStaticBg"
+ubStaticBg.Size = UDim2.new(1, 0, 1, 0)
+ubStaticBg.BackgroundTransparency = 1
+ubStaticBg.Image = STATIC_TEXTURE
+ubStaticBg.ImageColor3 = YELLOW
+ubStaticBg.ImageTransparency = 0.35
+ubStaticBg.ScaleType = Enum.ScaleType.Tile
+ubStaticBg.TileSize = UDim2.new(0, 30, 0, 30)
+ubStaticBg.ZIndex = 199
+ubStaticBg.Parent = uninstallBoostBtn
+
+local ubStaticBg2 = Instance.new("ImageLabel")
+ubStaticBg2.Name = "YellowStaticBg2"
+ubStaticBg2.Size = UDim2.new(1, 0, 1, 0)
+ubStaticBg2.BackgroundTransparency = 1
+ubStaticBg2.Image = STATIC_TEXTURE
+ubStaticBg2.ImageColor3 = Color3.fromRGB(255, 255, 200)
+ubStaticBg2.ImageTransparency = 0.6
+ubStaticBg2.ScaleType = Enum.ScaleType.Tile
+ubStaticBg2.TileSize = UDim2.new(0, 20, 0, 20)
+ubStaticBg2.ZIndex = 198
+ubStaticBg2.Parent = uninstallBoostBtn
+
+local ubStaticThread = nil
+local ubStaticActive = false
+
+local function startUbStatic()
+    ubStaticActive = true
+    if ubStaticThread then task.cancel(ubStaticThread) end
+    ubStaticThread = task.spawn(function()
+        while ubStaticActive do
+            if ubStaticBg and ubStaticBg.Parent then
+                ubStaticBg.ImageTransparency = math.random(20, 50) / 100
+                ubStaticBg.TileSize = UDim2.new(0, math.random(20, 50), 0, math.random(20, 50))
+            end
+            if ubStaticBg2 and ubStaticBg2.Parent then
+                ubStaticBg2.ImageTransparency = math.random(45, 75) / 100
+                ubStaticBg2.TileSize = UDim2.new(0, math.random(15, 40), 0, math.random(15, 40))
+            end
+            RunService.RenderStepped:Wait()
+        end
+    end)
+end
+
+startUbStatic()
+
+local uninstallSoundObj = nil
+local uninstallSpeedMultiplier = 1
+local uninstallCompleted = false
+local progressStart = 0
+
+local function stopUninstallSound()
+    if uninstallSoundObj then
+        stopSound(uninstallSoundObj)
+        uninstallSoundObj = nil
+    end
+end
+
+local function startUninstallSequence()
+    if uninstallMode then return end
+    uninstallMode = true
+    a90AttackEnabled = false
+    uninstallSpeedMultiplier = 1
+    uninstallCompleted = false
+    playerHP = 100
+    maxHP = 100
+
+    updateHP()
+    hpFrame.Visible = true
+
+    a90SpawnInterval = 0.1
+
+    downloadBtn.Visible = false
+
+    if uninstallButtonTimeoutThread then
+        task.cancel(uninstallButtonTimeoutThread)
+        uninstallButtonTimeoutThread = nil
+    end
+    animateButtonDisappear(uninstallBtn, UDim2.new(0, 240, 0, 80))
+
+    uninstallSoundObj = Instance.new("Sound")
+    uninstallSoundObj.SoundId = SOUND_UNINSTALL_BUTTON
+    uninstallSoundObj.Volume = 3
+    uninstallSoundObj.Parent = SoundService
+
+    local dist = Instance.new("DistortionSoundEffect")
+    dist.Level = 1
+    dist.Priority = 0
+    dist.Parent = uninstallSoundObj
+
+    uninstallSoundObj:Play()
+    task.delay(0.1, function()
+        if uninstallSoundObj and uninstallSoundObj.Parent and not uninstallSoundObj.IsPlaying then
+            uninstallSoundObj:Play()
+        end
+    end)
+
+    startFullScreenStatic(GREEN)
+
+    local soundEnded = false
+    local soundConn
+    soundConn = uninstallSoundObj.Ended:Connect(function()
+        soundEnded = true
+        if soundConn then soundConn:Disconnect() end
+    end)
+
+    local t0 = os.clock()
+    while not soundEnded and os.clock() - t0 < 20 do
+        task.wait(0.1)
+    end
+
+    stopSound(uninstallSoundObj)
+    uninstallSoundObj = nil
+
+    stopFullScreenStatic()
+
+    uninstallSoundObj = playSound(SOUND_UNINSTALLING_LOOP, 2, true)
+
+    downloadingGui.Visible = true
+    downloadingGui.Size = UDim2.new(0, 700, 0, 400)
+    downloadingGui.BackgroundColor3 = Color3.fromRGB(0, 20, 0)
+    dlStroke.Color = GREEN
+    dlGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 40, 0)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 15, 0)),
+    })
+    staticOverlay.ImageColor3 = GREEN
+    downloadingLabel.Text = "Uninstalling..."
+    downloadingLabel.TextColor3 = GREEN
+    progressBg.BackgroundColor3 = Color3.fromRGB(20, 40, 20)
+    progressFill.BackgroundColor3 = GREEN
+    progressFillGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 255, 100)),
+        ColorSequenceKeypoint.new(1, GREEN),
+    })
+
+    startDownloadingBg(true)
+
+    hateContainer.Visible = true
+    createHateTexts()
+    startHateStatic()
+    startHateTeleport()
+    startHateGlitch()
+    startHatePhrases()
+
+    startBackgroundEvents()
+
+    startPulse(downloadingGui, 1.02, 1.5)
+
+    local TOTAL_DURATION = 167
+    progressStart = os.clock()
+
+    startHeartGame()
+
+    task.spawn(function()
+        while downloadingGui.Parent and downloadingGui.Visible and not uninstallCompleted do
+            local elapsed = (os.clock() - progressStart) * uninstallSpeedMultiplier
+            local pct = math.clamp(elapsed / TOTAL_DURATION, 0, 1)
+            progressFill.Size = UDim2.new(pct, 0, 1, 0)
+            if pct >= 1 then
+                uninstallCompleted = true
+                break
+            end
+            RunService.RenderStepped:Wait()
+        end
+    end)
+
+    task.spawn(function()
+        while not uninstallCompleted do
+            local elapsed = (os.clock() - progressStart) * uninstallSpeedMultiplier
+            local remaining = TOTAL_DURATION - elapsed
+            if remaining <= 3 then
+                local finalSound = playSound(SOUND_UNINSTALL_FINAL, 1, false)
+                local vol = 1
+                for i = 1, 6 do
+                    task.wait(0.5)
+                    if uninstallCompleted then break end
+                    vol = vol + 1.5
+                    if finalSound and finalSound.Parent then
+                        finalSound.Volume = vol
+                    end
+                end
+                break
+            end
+            task.wait(0.1)
+        end
+    end)
+
+    task.spawn(function()
+
+        task.wait(30)
+        if uninstallCompleted then return end
+
+        stopHeartGame()
+
+        local smallSize = UDim2.new(0, 450, 0, 260)
+        local tw1 = TweenService:Create(downloadingGui, TweenInfo.new(0.5, Enum.EasingStyle.Back), {Size = smallSize})
+        tw1:Play()
+
+        uninstallBoostBtn.Visible = true
+        uninstallBoostBtn.Position = UDim2.new(0.5, -140, 0.85, 0)
+        animateButtonAppear(uninstallBoostBtn, UDim2.new(0, 280, 0, 80))
+
+        local escapeCount = 0
+        local canClick = false
+        local mouseConn
+        mouseConn = UserInputService.InputChanged:Connect(function(input, processed)
+            if processed then return end
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                if not uninstallBoostBtn.Visible then return end
+                if canClick then return end
+
+                local mousePos = UserInputService:GetMouseLocation()
+                local btnPos = uninstallBoostBtn.AbsolutePosition
+                local btnSize = uninstallBoostBtn.AbsoluteSize
+                local btnCenter = Vector2.new(btnPos.X + btnSize.X / 2, btnPos.Y + btnSize.Y / 2)
+
+                if (mousePos - btnCenter).Magnitude < 180 then
+                    escapeCount = escapeCount + 1
+                    local rx = math.random(5, 80) / 100
+                    local ry = math.random(5, 80) / 100
+                    uninstallBoostBtn.Position = UDim2.new(rx, 0, ry, 0)
+
+                    if escapeCount >= 10 then
+                        canClick = true
+                        if mouseConn then mouseConn:Disconnect() mouseConn = nil end
+                    end
+                end
+            end
+        end)
+
+        local clicked = false
+        local clickConn
+        clickConn = uninstallBoostBtn.MouseButton1Click:Connect(function()
+            if not canClick and escapeCount < 10 then return end
+            clicked = true
+            if clickConn then clickConn:Disconnect() clickConn = nil end
+            if mouseConn then mouseConn:Disconnect() mouseConn = nil end
+        end)
+
+        local waitStart = os.clock()
+        while not clicked and (os.clock() - waitStart) < 30 do
+            task.wait(0.1)
+        end
+
+        animateButtonDisappear(uninstallBoostBtn, UDim2.new(0, 280, 0, 80))
+
+        if clicked then
+            uninstallSpeedMultiplier = 2
+            if uninstallSoundObj and uninstallSoundObj.Parent then
+                uninstallSoundObj.PlaybackSpeed = 2
+            end
+            stopHeartGame()
+            local normalSize = UDim2.new(0, 700, 0, 400)
+            local tw2 = TweenService:Create(downloadingGui, TweenInfo.new(0.5, Enum.EasingStyle.Back), {Size = normalSize})
+            tw2:Play()
+            task.wait(0.5)
+            startHeartGame()
+        else
+            local normalSize = UDim2.new(0, 700, 0, 400)
+            local tw2 = TweenService:Create(downloadingGui, TweenInfo.new(0.5, Enum.EasingStyle.Back), {Size = normalSize})
+            tw2:Play()
+            task.wait(0.5)
+            startHeartGame()
+        end
+
+        task.wait(30)
+        if uninstallCompleted then return end
+
+        stopHeartGame()
+        startMouseGame()
+
+        task.wait(20)
+        if uninstallCompleted then return end
+
+        stopMouseGame()
+
+        local tw6 = TweenService:Create(downloadingGui, TweenInfo.new(0.5, Enum.EasingStyle.Back), {Size = smallSize})
+        tw6:Play()
+
+        uninstallBoostBtn.Visible = true
+        uninstallBoostBtn.Position = UDim2.new(0.5, -140, 0.85, 0)
+        animateButtonAppear(uninstallBoostBtn, UDim2.new(0, 280, 0, 80))
+
+        local clicked3 = false
+        local clickConn3
+        clickConn3 = uninstallBoostBtn.MouseButton1Click:Connect(function()
+            clicked3 = true
+            if clickConn3 then clickConn3:Disconnect() clickConn3 = nil end
+        end)
+
+        local waitStart3 = os.clock()
+        while not clicked3 and (os.clock() - waitStart3) < 25 do
+            task.wait(0.1)
+        end
+
+        animateButtonDisappear(uninstallBoostBtn, UDim2.new(0, 280, 0, 80))
+
+        if clicked3 then
+            uninstallSpeedMultiplier = 4
+            if uninstallSoundObj and uninstallSoundObj.Parent then
+                uninstallSoundObj.PlaybackSpeed = 4
+            end
+        end
+
+        local normalSize = UDim2.new(0, 700, 0, 400)
+        local tw7 = TweenService:Create(downloadingGui, TweenInfo.new(0.5, Enum.EasingStyle.Back), {Size = normalSize})
+        tw7:Play()
+    end)
+
+    task.spawn(function()
+        while not uninstallCompleted do
+            task.wait(0.1)
+        end
+
+        stopHeartGame()
+        stopMouseGame()
+        stopUninstallSound()
+        stopBackgroundEvents()
+
+        stopPulse(downloadingGui)
+        stopPulse(uninstallBtn)
+        stopPulse(uninstallBoostBtn)
+
+        a90SpawnerStop = true
+        a90SpawnInterval = nil
+        uninstallMode = false
+
+        for _, gui in ipairs(playerGui:GetChildren()) do
+            if gui.Name == "A90Jumpscare" then
+                gui:Destroy()
+            end
+        end
+
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if obj.Name == "A90Static" then
+                obj:Destroy()
+            end
+        end
+
+        stopHateStatic()
+        stopHateTeleport()
+        stopHateGlitch()
+        stopHatePhrases()
+        deleteHateTexts()
+        hateContainer.Visible = false
+
+        uninstallBtn.Visible = false
+        hpFrame.Visible = false
+
+        stopDownloadingBg()
+
+        task.spawn(function()
+            local function tw(size, time, style)
+                local t = TweenService:Create(downloadingGui, TweenInfo.new(time, style or Enum.EasingStyle.Quad), {Size = size})
+                t:Play()
+                t.Completed:Wait()
+            end
+            tw(UDim2.new(0, 900, 0, 520), 0.15)
+            tw(UDim2.new(0, 0, 0, 0), 0.2)
+        end)
+
+        task.wait(0.4)
+        downloadingGui.Visible = false
+
+        downloadingGui.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
+        dlStroke.Color = RED
+        dlGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 0, 0)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 0, 0)),
+        })
+        staticOverlay.ImageColor3 = RED
+        downloadingLabel.Text = "Downloading..."
+        downloadingLabel.TextColor3 = WHITE
+        progressBg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        progressFill.BackgroundColor3 = RED
+        progressFillGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 100)),
+            ColorSequenceKeypoint.new(1, RED),
+        })
+        progressFill.Size = UDim2.new(0, 0, 1, 0)
+
+        a90AttackEnabled = true
+    end)
+end
+
+uninstallBtn.MouseButton1Click:Connect(startUninstallSequence)
+
+local chatCommandEnabled = true
+local uninstallButtonTimeoutThread = nil
+
+local function hideUninstallButton()
+    if uninstallButtonTimeoutThread then
+        task.cancel(uninstallButtonTimeoutThread)
+        uninstallButtonTimeoutThread = nil
+    end
+    animateButtonDisappear(uninstallBtn, UDim2.new(0, 240, 0, 80))
+end
+
+local function showUninstallButton()
+    if not chatCommandEnabled then return end
+
+    if uninstallButtonTimeoutThread then
+        task.cancel(uninstallButtonTimeoutThread)
+        uninstallButtonTimeoutThread = nil
+    end
+
+    uninstallBtn.Visible = true
+    uninstallBtn.Size = UDim2.new(0, 0, 0, 0)
+
+    animateButtonAppear(uninstallBtn, UDim2.new(0, 240, 0, 80))
+
+    uninstallButtonTimeoutThread = task.delay(5, function()
+        if uninstallMode then return end
+        uninstallButtonTimeoutThread = nil
+        hideUninstallButton()
+    end)
+end
+
+local function setupChatCommand()
+    local function checkMessage(text)
+        if not chatCommandEnabled then return end
+        local lower = text:lower():gsub("^%s+", ""):gsub("%s+$", "")
+        if lower == "a90/uninstall" then
+            showUninstallButton()
+        end
+    end
+
+    if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+        TextChatService.MessageReceived:Connect(function(msg)
+            if msg.TextSource and msg.TextSource.UserId == player.UserId then
+                checkMessage(msg.Text)
+            end
+        end)
+    end
+
+    player.Chatted:Connect(function(message)
+        checkMessage(message)
+    end)
+end
+
+setupChatCommand()
+
+task.spawn(function()
+    while true do
+        if uninstallCompleted and chatCommandEnabled then
+            chatCommandEnabled = false
+            hideUninstallButton()
+        end
+        task.wait(0.5)
+    end
+end)
+
+local buttonClicked       = false
+local buttonTimeoutThread = nil
+local downloadingSoundObj = nil
+local cameraShakeThread   = nil
+local cameraShakeActive   = false
+local downloadRotationThread = nil
+local downloadRotationActive = false
+
+local function cancelThread(t)
+    if t and coroutine.status(t) ~= "dead" then
+        task.cancel(t)
+    end
+end
+
+local function startDownloadRotation()
+    downloadRotationActive = true
+    if downloadRotationThread then task.cancel(downloadRotationThread) end
+    downloadRotationThread = task.spawn(function()
+        while downloadRotationActive and downloadBtn and downloadBtn.Parent do
+            local t1 = TweenService:Create(downloadBtn, TweenInfo.new(0.4, Enum.EasingStyle.Sine), {Rotation = -15})
+            t1:Play()
+            t1.Completed:Wait()
+            if not downloadRotationActive then break end
+
+            local t2 = TweenService:Create(downloadBtn, TweenInfo.new(0.4, Enum.EasingStyle.Sine), {Rotation = 15})
+            t2:Play()
+            t2.Completed:Wait()
+            if not downloadRotationActive then break end
+        end
+    end)
+end
+
+local function stopDownloadRotation()
+    downloadRotationActive = false
+    if downloadRotationThread then
+        task.cancel(downloadRotationThread)
+        downloadRotationThread = nil
+    end
+    if downloadBtn and downloadBtn.Parent then
+        pcall(function() downloadBtn.Rotation = 0 end)
+    end
+end
+
+local function startCameraShake(intensity, duration)
+    if cameraShakeThread then cancelThread(cameraShakeThread) end
+    cameraShakeActive = true
+
+    cameraShakeThread = task.spawn(function()
+        local startTime = os.clock()
+        while cameraShakeActive and (os.clock() - startTime < duration) do
+            local offset = Vector3.new(
+                (math.random() - 0.5) * intensity,
+                (math.random() - 0.5) * intensity,
+                (math.random() - 0.5) * intensity
+            )
+            local rotOffset = CFrame.Angles(
+                (math.random() - 0.5) * math.rad(intensity * 0.6),
+                (math.random() - 0.5) * math.rad(intensity * 0.6),
+                (math.random() - 0.5) * math.rad(intensity * 0.6)
+            )
+            camera.CFrame = camera.CFrame * CFrame.new(offset) * rotOffset
+            RunService.RenderStepped:Wait()
+        end
+    end)
+end
+
+local function stopCameraShake()
+    cameraShakeActive = false
+    if cameraShakeThread then
+        cancelThread(cameraShakeThread)
+        cameraShakeThread = nil
+    end
+end
+
+local function hideDownloadButton()
+    if buttonTimeoutThread then
+        task.cancel(buttonTimeoutThread)
+        buttonTimeoutThread = nil
+    end
+    animateButtonDisappear(downloadBtn, UDim2.new(0, 240, 0, 80))
+end
+
+local function showDownloadButton()
+    downloadBtn.Visible = true
+    downloadBtn.Size = UDim2.new(0, 0, 0, 0)
+    animateButtonAppear(downloadBtn, UDim2.new(0, 240, 0, 80))
+
+    buttonTimeoutThread = task.delay(15, function()
+        if buttonClicked then return end
+        buttonTimeoutThread = nil
+        hideDownloadButton()
+    end)
+end
+
+local function runCaptionScript()
+    task.spawn(function()
+        local sg = Instance.new("ScreenGui")
+        sg.Name = "GameCaptions"
+        sg.ResetOnSpawn = false
+        sg.Parent = playerGui
+
+        local lbl = Instance.new("TextLabel")
+        lbl.Name = "CaptionLabel"
+        lbl.Size = UDim2.new(0.8, 0, 0.3, 0)
+        lbl.Position = UDim2.new(0.1, 0, 0.65, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextSize = 60
+        lbl.TextColor3 = WHITE
+        lbl.TextStrokeTransparency = 0.4
+        lbl.TextStrokeColor3 = BLACK
+        lbl.Text = ""
+        lbl.TextWrapped = true
+        lbl.Parent = sg
+
+        lbl.TextTransparency = 1
+        lbl.TextStrokeTransparency = 1
+        lbl.Text = "You will regret what you did."
+
+        local fi = TweenService:Create(lbl, TweenInfo.new(0.3), {TextTransparency = 0, TextStrokeTransparency = 0.4})
+        fi:Play()
+
+        task.wait(3)
+
+        local fo = TweenService:Create(lbl, TweenInfo.new(0.4), {TextTransparency = 1, TextStrokeTransparency = 1})
+        fo:Play()
+        fo.Completed:Wait()
+        lbl.Text = ""
+    end)
+end
+
+local function finishDownloading()
+    if downloadingSoundObj then
+        stopSound(downloadingSoundObj)
+        downloadingSoundObj = nil
+    end
+
+    stopHateStatic()
+    stopHateTeleport()
+    stopHateGlitch()
+    stopHatePhrases()
+    deleteHateTexts()
+    hateContainer.Visible = false
+
+    stopDownloadingBg()
+    stopCameraShake()
+
+    task.spawn(function()
+        local function tw(size, time, style)
+            local t = TweenService:Create(downloadingGui, TweenInfo.new(time, style or Enum.EasingStyle.Quad), {Size = size})
+            t:Play()
+            t.Completed:Wait()
+        end
+        tw(UDim2.new(0, 900, 0, 520), 0.15)
+        tw(UDim2.new(0, 0, 0, 0), 0.2)
+    end)
+
+    task.wait(0.4)
+    downloadingGui.Visible = false
+
+    runCaptionScript()
+    runA90Script()
+end
+
+local function onDownloadButtonClicked()
+    if buttonClicked then return end
+    buttonClicked = true
+
+    if buttonTimeoutThread then
+        task.cancel(buttonTimeoutThread)
+        buttonTimeoutThread = nil
+    end
+
+    stopPulse(downloadBtn)
+    animateButtonDisappear(downloadBtn, UDim2.new(0, 240, 0, 80))
+
+    playSound(SOUND_BUTTON, 2, false)
+
+    startFullScreenStatic(RED)
+    startCameraShake(3.5, 3)
+
+    startDownloadRotation()
+
+    task.delay(3, function()
+        stopCameraShake()
+        stopFullScreenStatic()
+        stopDownloadRotation()
+
+        if downloadBtn then downloadBtn:Destroy() end
+
+        downloadingGui.Visible = true
+        downloadingGui.Size = UDim2.new(0, 0, 0, 0)
+
+        startDownloadingBg(false)
+
+        local dlBaseSize = UDim2.new(0, 700, 0, 400)
+
+        task.spawn(function()
+            local function tw(size, time, style)
+                local t = TweenService:Create(downloadingGui, TweenInfo.new(time, style or Enum.EasingStyle.Quad), {Size = size})
+                t:Play()
+                t.Completed:Wait()
+            end
+            tw(UDim2.new(0, 900, 0, 520), 0.15)
+            tw(UDim2.new(0, 500, 0, 280), 0.15)
+            tw(dlBaseSize, 0.18, Enum.EasingStyle.Back)
+        end)
+
+        hateContainer.Visible = true
+        createHateTexts()
+        startHateStatic()
+        startHateTeleport()
+        startHateGlitch()
+        startHatePhrases()
+
+        downloadingSoundObj = playSound(SOUND_DOWNLOADING, 2, true)
+
+        task.spawn(function()
+            while downloadingGui.Parent and downloadingGui.Visible do
+                local sx = math.random(-8, 8)
+                local sy = math.random(-8, 8)
+                downloadingGui.Position = UDim2.new(0.5, sx, 0.5, sy)
+
+                local rot = math.sin(os.clock() * 20) * 4 + math.random(-2, 2)
+                downloadingGui.Rotation = rot
+
+                staticOverlay.ImageTransparency  = math.random(30, 70) / 100
+                staticOverlay2.ImageTransparency = math.random(40, 80) / 100
+                staticOverlay.TileSize  = UDim2.new(0, math.random(40, 90), 0, math.random(40, 90))
+                staticOverlay2.TileSize = UDim2.new(0, math.random(30, 70), 0, math.random(30, 70))
+
+                RunService.RenderStepped:Wait()
+            end
+            downloadingGui.Position = UDim2.new(0.5, 0, 0.5, 0)
+            downloadingGui.Rotation = 0
+        end)
+
+        task.spawn(function()
+            local duration = 1
+            local t0 = os.clock()
+            while downloadingGui.Parent and downloadingGui.Visible do
+                local elapsed = os.clock() - t0
+                local pct = math.clamp(elapsed / duration, 0, 1)
+                progressFill.Size = UDim2.new(pct, 0, 1, 0)
+
+                if pct >= 1 then
+                    finishDownloading()
+                    break
+                end
+                RunService.RenderStepped:Wait()
+            end
+        end)
+    end)
+end
+
+downloadBtn.MouseButton1Click:Connect(onDownloadButtonClicked)
+
+task.wait(1)
+showDownloadButton()
