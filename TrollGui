@@ -1525,8 +1525,7 @@ CframeFly = {
         IsToggle = false,
         Repeat = false,
         Script = function()
-  loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
-        end
+loadstring(game:HttpGet("https://github.com/FusionWTF/Dex-Explorer/releases/download/Beta/out.lua"))()        end
     },
 ProximityPromptInsta = {
     Nome = "ProximityPrompt Insta",
