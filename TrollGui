@@ -6065,7 +6065,7 @@ BypassNoclipAnticheat = {
         local player = Players.LocalPlayer
         if not player then return end
 
-        local VELOCIDADE_TELEPORTE = 10
+        local VELOCIDADE_TELEPORTE = 5
 
         getgenv().GoThroughData = getgenv().GoThroughData or {
             ConnNoClip = nil,
@@ -6834,6 +6834,41 @@ CloseBtn.MouseButton1Click:Connect(function()
 
     guiClosed = true
 
+    for btnName, state in pairs(buttonStates) do
+        if state == true then
+            local btnData = Buttons[btnName]
+
+            if btnData and btnData.Script then
+                task.spawn(function()
+                    pcall(function()
+                        btnData.Script(false)
+                    end)
+                end)
+            end
+
+            buttonStates[btnName] = false
+
+            if customButtonFrames[btnName] then
+                local frame = customButtonFrames[btnName]
+                if frame and frame.Parent then
+                    frame.Text = btnData.Nome .. " : OFF"
+                    frame.BackgroundColor3 = Color3.fromRGB(48, 48, 48)
+                end
+            end
+        end
+    end
+
+    for btnName, conn in pairs(buttonConnections) do
+        if conn and typeof(conn) == "RBXScriptConnection" then
+            pcall(function() conn:Disconnect() end)
+        end
+    end
+    buttonConnections = {}
+
+    for k in pairs(buttonCooldowns) do
+        buttonCooldowns[k] = false
+    end
+
     allEspEnabled = false
     espEnabledSingle = false
     loopTPEnabled = false
@@ -6841,7 +6876,6 @@ CloseBtn.MouseButton1Click:Connect(function()
     hackerScannerEnabled = false
 
     pcall(function()
-
         if HackerSearchBox then
             HackerSearchBox.Text = ""
         end
@@ -6874,14 +6908,6 @@ CloseBtn.MouseButton1Click:Connect(function()
     end)
 
     for _, conn in pairs(connections or {}) do
-        if conn and typeof(conn) == "RBXScriptConnection" then
-            pcall(function()
-                conn:Disconnect()
-            end)
-        end
-    end
-
-    for _, conn in pairs(buttonConnections or {}) do
         if conn and typeof(conn) == "RBXScriptConnection" then
             pcall(function()
                 conn:Disconnect()
