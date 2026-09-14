@@ -2027,12 +2027,12 @@ uninstallBoostBtn.BackgroundColor3 = YELLOW
 uninstallBoostBtn.BorderSizePixel = 0
 uninstallBoostBtn.Text = "Uninstall Boost"
 uninstallBoostBtn.TextColor3 = BLACK
-uninstallBoostBtn.Font = Enum.Font.GothamBold
+uninstallBoostBtn.Font = Enum.Font.Oswald
 uninstallBoostBtn.TextSize = 30
 uninstallBoostBtn.TextStrokeTransparency = 1
 uninstallBoostBtn.AutoButtonColor = false
 uninstallBoostBtn.Visible = false
-uninstallBoostBtn.ZIndex = 200
+uninstallBoostBtn.ZIndex = 9999999
 uninstallBoostBtn.Parent = screenGui
 
 local ubCorner = Instance.new("UICorner")
