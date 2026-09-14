@@ -2504,6 +2504,7 @@ task.spawn(function()
         if uninstallCompleted and chatCommandEnabled then
             chatCommandEnabled = false
             hideUninstallButton()
+                    task.wait(0.1)
         end
         task.wait(0.5)
     end
