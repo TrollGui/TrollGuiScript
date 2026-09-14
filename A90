@@ -13,12 +13,13 @@ local camera    = workspace.CurrentCamera
 local SOUND_BUTTON      = "rbxassetid://139310882854462"
 local SOUND_DOWNLOADING = "rbxassetid://138548878793475"
 
-local ENABLE_RESPAWN         = true
+local ENABLE_RESPAWN = true
 local SOUND_APPEAR_LEAD_TIME = 0.5
 local INITIAL_DELAY          = 1
 local MIN_INTERVAL           = 30
 local MAX_INTERVAL           = 100
 local DAMAGE                 = 90
+local heartSpeedMultiplier = 1
 
 local SOUND_APPEAR = "rbxassetid://92453621152905"
 local SOUND_ATTACK = "rbxassetid://84909470598244"
@@ -994,13 +995,16 @@ local heartGameActive = false
 local heartGameThread = nil
 
 local function hasHeartOnSide(side)
+    local count = 0
     for _, h in ipairs(activeHearts) do
         if h.side == side and not h.resolved and h.frame and h.frame.Parent then
-            return true
+            count = count + 1
         end
     end
-    return false
+    return count
 end
+
+local MAX_HEARTS_PER_SIDE = 3
 
 local function spawnHeart(side)
     if not heartGameActive then return end
@@ -1055,6 +1059,8 @@ local function spawnHeart(side)
     heartGlow.ZIndex = 11
     heartGlow.Parent = heartFrame
 
+    local yPos = 0.5 + (math.random(-15, 15) / 100)
+
     local startX, endX
     if isLeft then
         startX = -0.15
@@ -1064,7 +1070,7 @@ local function spawnHeart(side)
         endX = 0.62
     end
 
-    heartFrame.Position = UDim2.new(startX, 0, 0.5, 0)
+    heartFrame.Position = UDim2.new(startX, 0, yPos, 0)
 
     local heartData = {
         frame = heartFrame,
@@ -1073,9 +1079,10 @@ local function spawnHeart(side)
     }
     table.insert(activeHearts, heartData)
 
-    local duration = 3.0
+    local baseDuration = 2.0
+    local duration = baseDuration / heartSpeedMultiplier
     local tween = TweenService:Create(heartFrame, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
-        Position = UDim2.new(endX, 0, 0.5, 0)
+        Position = UDim2.new(endX, 0, yPos, 0)
     })
     tween:Play()
 
@@ -1190,39 +1197,71 @@ UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 
+local MAX_HEARTS_PER_SIDE = 3
+
 local function startHeartGame()
     heartGameActive = true
     heartContainer.Visible = true
 
     for _, h in ipairs(activeHearts) do
-        if h.frame and h.frame.Parent then h.frame:Destroy() end
+        if h.frame and h.frame.Parent then
+            h.frame:Destroy()
+        end
     end
     activeHearts = {}
-
     startGridPulse()
 
     local startTime = os.clock()
     local duration = 30
 
-    if heartGameThread then task.cancel(heartGameThread) end
+    if heartGameThread then
+        task.cancel(heartGameThread)
+    end
+
     heartGameThread = task.spawn(function()
         while heartGameActive and (os.clock() - startTime) < duration do
-            local availableSides = {}
-            if not hasHeartOnSide("left") then table.insert(availableSides, "left") end
-            if not hasHeartOnSide("right") then table.insert(availableSides, "right") end
 
-            if #availableSides > 0 then
-                local side = availableSides[math.random(1, #availableSides)]
-                spawnHeart(side)
+            local availableSides = {}
+            if hasHeartOnSide("left") < MAX_HEARTS_PER_SIDE then
+                table.insert(availableSides, "left")
+            end
+            if hasHeartOnSide("right") < MAX_HEARTS_PER_SIDE then
+                table.insert(availableSides, "right")
             end
 
-            task.wait(math.random(7, 13) / 10)
+            if #availableSides > 0 then
+                local spawnCount = math.random(1, 2)
+
+                for i = 1, spawnCount do
+
+                    availableSides = {}
+                    if hasHeartOnSide("left") < MAX_HEARTS_PER_SIDE then
+                        table.insert(availableSides, "left")
+                    end
+                    if hasHeartOnSide("right") < MAX_HEARTS_PER_SIDE then
+                        table.insert(availableSides, "right")
+                    end
+
+                    if #availableSides > 0 then
+                        local side = availableSides[math.random(1, #availableSides)]
+                        spawnHeart(side)
+                    else
+                        break
+                    end
+                end
+            end
+
+            task.wait(math.random(4, 8) / 10)
         end
+
         heartGameActive = false
         heartContainer.Visible = false
         stopGridPulse()
+
         for _, h in ipairs(activeHearts) do
-            if h.frame and h.frame.Parent then h.frame:Destroy() end
+            if h.frame and h.frame.Parent then
+                h.frame:Destroy()
+            end
         end
         activeHearts = {}
     end)
@@ -2072,6 +2111,7 @@ local function startUninstallSequence()
     uninstallMode = true
     a90AttackEnabled = false
     uninstallSpeedMultiplier = 1
+    heartSpeedMultiplier = 1
     uninstallCompleted = false
     playerHP = 100
     maxHP = 100
@@ -2258,6 +2298,7 @@ local function startUninstallSequence()
 
         if clicked then
             uninstallSpeedMultiplier = 2
+            heartSpeedMultiplier = 1.2
             if uninstallSoundObj and uninstallSoundObj.Parent then
                 uninstallSoundObj.PlaybackSpeed = 2
             end
@@ -2309,6 +2350,7 @@ local function startUninstallSequence()
 
         if clicked3 then
             uninstallSpeedMultiplier = 4
+            heartSpeedMultiplier = 1.3
             if uninstallSoundObj and uninstallSoundObj.Parent then
                 uninstallSoundObj.PlaybackSpeed = 4
             end
@@ -2632,7 +2674,11 @@ local function finishDownloading()
 end
 
 local function onDownloadButtonClicked()
+if ENABLE_RESPAWN == false then  
+downloadCompleted = false
+else
 downloadCompleted = true
+end
     if buttonClicked then return end
     buttonClicked = true
 
