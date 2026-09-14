@@ -16,10 +16,10 @@ local SOUND_DOWNLOADING = "rbxassetid://138548878793475"
 local ENABLE_RESPAWN = true
 local SOUND_APPEAR_LEAD_TIME = 0.5
 local INITIAL_DELAY          = 1
-local MIN_INTERVAL           = 30
-local MAX_INTERVAL           = 100
+local MIN_INTERVAL           = 40
+local MAX_INTERVAL           = 15
 local DAMAGE                 = 90
-local heartSpeedMultiplier = 1
+local heartSpeedMultiplier = 1.5
 
 local SOUND_APPEAR = "rbxassetid://92453621152905"
 local SOUND_ATTACK = "rbxassetid://84909470598244"
@@ -1197,7 +1197,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 
-local MAX_HEARTS_PER_SIDE = 3
+local MAX_HEARTS_PER_SIDE = 1
 
 local function startHeartGame()
     heartGameActive = true
@@ -2111,7 +2111,7 @@ local function startUninstallSequence()
     uninstallMode = true
     a90AttackEnabled = false
     uninstallSpeedMultiplier = 1
-    heartSpeedMultiplier = 1
+    heartSpeedMultiplier = 1.5
     uninstallCompleted = false
     playerHP = 100
     maxHP = 100
@@ -2298,7 +2298,7 @@ local function startUninstallSequence()
 
         if clicked then
             uninstallSpeedMultiplier = 2
-            heartSpeedMultiplier = 1.2
+            heartSpeedMultiplier = 2
             if uninstallSoundObj and uninstallSoundObj.Parent then
                 uninstallSoundObj.PlaybackSpeed = 2
             end
@@ -2350,7 +2350,7 @@ local function startUninstallSequence()
 
         if clicked3 then
             uninstallSpeedMultiplier = 4
-            heartSpeedMultiplier = 1.3
+            heartSpeedMultiplier = 2.5
             if uninstallSoundObj and uninstallSoundObj.Parent then
                 uninstallSoundObj.PlaybackSpeed = 4
             end
