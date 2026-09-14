@@ -16,8 +16,8 @@ local SOUND_DOWNLOADING = "rbxassetid://138548878793475"
 local ENABLE_RESPAWN = true
 local SOUND_APPEAR_LEAD_TIME = 0.5
 local INITIAL_DELAY          = 1
-local MIN_INTERVAL           = 15
-local MAX_INTERVAL           = 25
+local MIN_INTERVAL           = 10
+local MAX_INTERVAL           = 10
 local DAMAGE                 = 90
 local heartSpeedMultiplier = 1.5
 
@@ -2483,6 +2483,757 @@ local function setupChatCommand()
             showUninstallButton()
         end
     end
+    
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Debris = game:GetService("Debris")
+
+local Player = Players.LocalPlayer
+local Backpack = Player:WaitForChild("Backpack")
+
+local Pencil = nil
+local PencilCriado = false
+local PencilEquipado = false
+local Desenhando = false
+local UltimoDesenho = nil
+local DespawnManual = false
+local UltimoDownload = false
+local MouseAtual = nil
+
+local IMAGE_ID = "rbxassetid://12440673931"
+local TOOL_IMAGE = "rbxassetid://4459364147"
+
+local SOUND_DRAW_START = "rbxassetid://139005512098246"
+local SOUND_DRAW_FINISH = "rbxassetid://131588755053462"
+
+local DRAW_TIME = 4
+local GREEN = Color3.fromRGB(40, 255, 70)
+
+local function removerPencil()
+    PencilCriado = false
+    PencilEquipado = false
+    Desenhando = false
+    MouseAtual = nil
+
+    if UltimoDesenho then
+        UltimoDesenho:Destroy()
+        UltimoDesenho = nil
+    end
+
+    if Pencil then
+        Pencil:Destroy()
+        Pencil = nil
+    end
+end
+
+local function criarPeca(parent, name, size, color, material, cframe)
+    local part = Instance.new("Part")
+    part.Name = name
+    part.Size = size
+    part.Color = color
+    part.Material = material
+    part.CFrame = cframe
+    part.CanCollide = false
+    part.CanTouch = false
+    part.CanQuery = false
+    part.Massless = true
+    part.CastShadow = true
+    part.Parent = parent
+    return part
+end
+
+local function soldar(a, b)
+    local weld = Instance.new("WeldConstraint")
+    weld.Part0 = a
+    weld.Part1 = b
+    weld.Parent = b
+end
+
+local function criarPencil()
+
+    if PencilCriado then
+        return
+    end
+
+    if downloadCompleted ~= true then
+        return
+    end
+
+    if uninstallMode == true then
+        return
+    end
+
+    if DespawnManual then
+        return
+    end
+
+    PencilCriado = true
+
+    local Tool = Instance.new("Tool")
+    Tool.Name = "Pencil"
+    Tool.RequiresHandle = true
+    Tool.CanBeDropped = false
+    Tool.ToolTip = "Clique para desenhar • R para remover"
+    Tool.TextureId = TOOL_IMAGE
+
+    Tool.Grip = CFrame.new(0, 0, 0)
+
+    local Handle = Instance.new("Part")
+    Handle.Name = "Handle"
+    Handle.Size = Vector3.new(0.22, 2.85, 0.22)
+    Handle.Color = Color3.fromRGB(248, 188, 65)
+    Handle.Material = Enum.Material.SmoothPlastic
+    Handle.CanCollide = false
+    Handle.CanTouch = false
+    Handle.CanQuery = false
+    Handle.Massless = true
+    Handle.Parent = Tool
+
+    local Detail1 = criarPeca(
+        Tool,
+        "GoldenLine1",
+        Vector3.new(0.025, 2.72, 0.025),
+        Color3.fromRGB(255, 225, 125),
+        Enum.Material.SmoothPlastic,
+        Handle.CFrame * CFrame.new(0.095, 0, 0.095)
+    )
+    soldar(Handle, Detail1)
+
+    local Detail2 = criarPeca(
+        Tool,
+        "GoldenLine2",
+        Vector3.new(0.025, 2.72, 0.025),
+        Color3.fromRGB(165, 105, 25),
+        Enum.Material.SmoothPlastic,
+        Handle.CFrame * CFrame.new(-0.095, 0, -0.095)
+    )
+    soldar(Handle, Detail2)
+
+    local Detail3 = criarPeca(
+        Tool,
+        "GoldenLine3",
+        Vector3.new(0.025, 2.72, 0.025),
+        Color3.fromRGB(255, 220, 105),
+        Enum.Material.SmoothPlastic,
+        Handle.CFrame * CFrame.new(-0.095, 0, 0.095)
+    )
+    soldar(Handle, Detail3)
+
+    local Detail4 = criarPeca(
+        Tool,
+        "GoldenLine4",
+        Vector3.new(0.025, 2.72, 0.025),
+        Color3.fromRGB(185, 120, 30),
+        Enum.Material.SmoothPlastic,
+        Handle.CFrame * CFrame.new(0.095, 0, -0.095)
+    )
+    soldar(Handle, Detail4)
+
+    local Ferrule = criarPeca(
+        Tool,
+        "MetalFerrule",
+        Vector3.new(0.34, 0.38, 0.34),
+        Color3.fromRGB(145, 145, 145),
+        Enum.Material.Metal,
+        Handle.CFrame * CFrame.new(0, 1.55, 0)
+    )
+    soldar(Handle, Ferrule)
+
+    local Ring1 = criarPeca(
+        Tool,
+        "MetalRing1",
+        Vector3.new(0.36, 0.065, 0.36),
+        Color3.fromRGB(80, 80, 80),
+        Enum.Material.Metal,
+        Handle.CFrame * CFrame.new(0, 1.39, 0)
+    )
+    soldar(Handle, Ring1)
+
+    local Ring2 = criarPeca(
+        Tool,
+        "MetalRing2",
+        Vector3.new(0.36, 0.065, 0.36),
+        Color3.fromRGB(205, 205, 205),
+        Enum.Material.Metal,
+        Handle.CFrame * CFrame.new(0, 1.72, 0)
+    )
+    soldar(Handle, Ring2)
+
+    local Eraser = criarPeca(
+        Tool,
+        "PinkEraser",
+        Vector3.new(0.30, 0.36, 0.30),
+        Color3.fromRGB(255, 100, 190),
+        Enum.Material.SmoothPlastic,
+        Handle.CFrame * CFrame.new(0, 1.91, 0)
+    )
+    soldar(Handle, Eraser)
+
+    local EraserTop = criarPeca(
+        Tool,
+        "EraserTop",
+        Vector3.new(0.27, 0.035, 0.27),
+        Color3.fromRGB(255, 155, 215),
+        Enum.Material.SmoothPlastic,
+        Handle.CFrame * CFrame.new(0, 2.09, 0)
+    )
+    soldar(Handle, EraserTop)
+
+    local WoodTip = criarPeca(
+        Tool,
+        "WoodTip",
+        Vector3.new(0.21, 0.43, 0.21),
+        Color3.fromRGB(245, 205, 135),
+        Enum.Material.Wood,
+        Handle.CFrame * CFrame.new(0, -1.63, 0)
+    )
+    soldar(Handle, WoodTip)
+
+    local Graphite = criarPeca(
+        Tool,
+        "GraphiteTip",
+        Vector3.new(0.065, 0.18, 0.065),
+        Color3.fromRGB(25, 25, 25),
+        Enum.Material.SmoothPlastic,
+        Handle.CFrame * CFrame.new(0, -1.91, 0)
+    )
+    soldar(Handle, Graphite)
+
+    Pencil = Tool
+    Tool.Parent = Backpack
+
+    Tool.Equipped:Connect(function(mouse)
+        PencilEquipado = true
+        MouseAtual = mouse
+    end)
+
+    Tool.Unequipped:Connect(function()
+        PencilEquipado = false
+        MouseAtual = nil
+    end)
+
+    Tool.Activated:Connect(function()
+
+        if not PencilEquipado then
+            return
+        end
+
+        if Desenhando then
+            return
+        end
+
+        if uninstallMode == true then
+            removerPencil()
+            return
+        end
+
+        if downloadCompleted ~= true then
+            return
+        end
+
+        if not MouseAtual then
+            return
+        end
+
+        local Target = MouseAtual.Target
+        local Hit = MouseAtual.Hit
+
+        if not Target or not Hit then
+            return
+        end
+
+        if Pencil and Target:IsDescendantOf(Pencil) then
+            return
+        end
+
+        local Character = Player.Character
+
+        if Character and Target:IsDescendantOf(Character) then
+            return
+        end
+
+        local Normal
+
+        if Target:IsA("BasePart") then
+
+            local Relative = Target.CFrame:PointToObjectSpace(Hit.Position)
+            local Half = Target.Size / 2
+
+            local DX = Half.X - math.abs(Relative.X)
+            local DY = Half.Y - math.abs(Relative.Y)
+            local DZ = Half.Z - math.abs(Relative.Z)
+
+            if DX <= DY and DX <= DZ then
+                Normal = Target.CFrame.RightVector * math.sign(Relative.X)
+            elseif DY <= DX and DY <= DZ then
+                Normal = Target.CFrame.UpVector * math.sign(Relative.Y)
+            else
+                Normal = Target.CFrame.LookVector * math.sign(Relative.Z)
+            end
+        else
+            Normal = Vector3.new(0, 1, 0)
+        end
+
+        if not Normal or Normal.Magnitude < 0.1 then
+            Normal = Vector3.new(0, 1, 0)
+        end
+
+        criarDesenho(Hit.Position, Normal)
+    end)
+end
+
+local function criarParticula(parent, texture, color, size, speed, lifetime)
+
+    local emitter = Instance.new("ParticleEmitter")
+    emitter.Texture = texture
+    emitter.Color = ColorSequence.new(color)
+    emitter.Size = size
+    emitter.Speed = NumberRange.new(speed * 0.6, speed)
+    emitter.Lifetime = NumberRange.new(lifetime * 0.7, lifetime)
+    emitter.SpreadAngle = Vector2.new(360, 360)
+    emitter.LightEmission = 1
+    emitter.LightInfluence = 0
+    emitter.Rotation = NumberRange.new(0, 360)
+    emitter.RotSpeed = NumberRange.new(-120, 120)
+    emitter.Rate = 0
+    emitter.Parent = parent
+
+    return emitter
+end
+
+local function criarRitual(posicao, normal)
+
+    local Ritual = Instance.new("Model")
+    Ritual.Name = "PencilRitual"
+    Ritual.Parent = workspace
+
+    local Centro = Instance.new("Part")
+    Centro.Name = "Center"
+    Centro.Anchored = true
+    Centro.CanCollide = false
+    Centro.CanTouch = false
+    Centro.CanQuery = false
+    Centro.Transparency = 1
+    Centro.Size = Vector3.new(1, 1, 1)
+
+    Centro.CFrame = CFrame.lookAt(
+        posicao + normal * 0.07,
+        posicao + normal
+    )
+
+    Centro.Parent = Ritual
+
+    local Attachment = Instance.new("Attachment")
+    Attachment.Parent = Centro
+
+    local Dust = criarParticula(
+        Attachment,
+        "rbxasset://textures/particles/smoke_main.dds",
+        Color3.fromRGB(100, 255, 125),
+        NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.15),
+            NumberSequenceKeypoint.new(0.3, 0.65),
+            NumberSequenceKeypoint.new(0.7, 0.4),
+            NumberSequenceKeypoint.new(1, 0)
+        }),
+        8,
+        1.2
+    )
+
+    local Sparks = criarParticula(
+        Attachment,
+        "rbxasset://textures/particles/sparkles_main.dds",
+        Color3.fromRGB(180, 255, 190),
+        NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.07),
+            NumberSequenceKeypoint.new(0.45, 0.2),
+            NumberSequenceKeypoint.new(1, 0)
+        }),
+        17,
+        0.9
+    )
+
+    Dust:Emit(70)
+    Sparks:Emit(90)
+
+    local Light = Instance.new("PointLight")
+    Light.Color = GREEN
+    Light.Brightness = 0
+    Light.Range = 0
+    Light.Shadows = true
+    Light.Parent = Centro
+
+    TweenService:Create(
+        Light,
+        TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            Brightness = 24,
+            Range = 100
+        }
+    ):Play()
+
+    local BaseCF = CFrame.lookAt(
+        posicao + normal * 0.09,
+        posicao + normal
+    )
+
+    local Circulos = {}
+
+    for i = 1, 3 do
+
+        local Circle = Instance.new("Part")
+        Circle.Name = "EnergyCircle" .. i
+        Circle.Shape = Enum.PartType.Cylinder
+        Circle.Anchored = true
+        Circle.CanCollide = false
+        Circle.CanTouch = false
+        Circle.CanQuery = false
+        Circle.Material = Enum.Material.Neon
+        Circle.Color = GREEN
+        Circle.Transparency = 0.15 + i * 0.1
+        Circle.Size = Vector3.new(0.025, 0.05, 0.05)
+
+        Circle.CFrame =
+            BaseCF *
+            CFrame.Angles(0, 0, math.rad(90))
+
+        Circle.Parent = Ritual
+
+        table.insert(Circulos, Circle)
+
+        task.delay((i - 1) * 0.08, function()
+
+            if not Circle.Parent then
+                return
+            end
+
+            TweenService:Create(
+                Circle,
+                TweenInfo.new(
+                    0.75 + i * 0.12,
+                    Enum.EasingStyle.Quint,
+                    Enum.EasingDirection.Out
+                ),
+                {
+                    Size = Vector3.new(
+                        0.025,
+                        5 + i * 2.8,
+                        5 + i * 2.8
+                    ),
+                    Transparency = 0.05 + i * 0.08
+                }
+            ):Play()
+        end)
+    end
+
+    task.spawn(function()
+
+        local Inicio = os.clock()
+
+        while Ritual.Parent and os.clock() - Inicio < 2.5 do
+
+            local Tempo = os.clock()
+
+            for i, Circle in ipairs(Circulos) do
+
+                if Circle.Parent then
+
+                    local Velocidade
+
+                    if i == 1 then
+                        Velocidade = 3
+                    elseif i == 2 then
+                        Velocidade = -2
+                    else
+                        Velocidade = 1.2
+                    end
+
+                    Circle.CFrame =
+                        Circle.CFrame *
+                        CFrame.Angles(
+                            0,
+                            0,
+                            math.rad(Velocidade)
+                        )
+                end
+            end
+
+            if Light.Parent then
+                Light.Brightness =
+                    22 + math.sin(Tempo * 9) * 7
+
+                Light.Range =
+                    95 + math.sin(Tempo * 6) * 15
+            end
+
+            task.wait()
+        end
+    end)
+
+    Debris:AddItem(Ritual, 3.5)
+
+    return Ritual
+end
+
+function criarDesenho(posicao, normal)
+
+    if Desenhando then
+        return
+    end
+
+    if not posicao or not normal then
+        return
+    end
+
+    if uninstallMode == true then
+        removerPencil()
+        return
+    end
+
+    Desenhando = true
+
+    if UltimoDesenho then
+        UltimoDesenho:Destroy()
+        UltimoDesenho = nil
+    end
+
+    local Drawing = Instance.new("Model")
+    Drawing.Name = "PencilDrawing"
+    Drawing.Parent = workspace
+    UltimoDesenho = Drawing
+
+    local BaseCF = CFrame.lookAt(
+        posicao + normal * 0.05,
+        posicao + normal
+    )
+
+    local Base = Instance.new("Part")
+    Base.Name = "DrawingSurface"
+    Base.Anchored = true
+    Base.CanCollide = false
+    Base.CanTouch = false
+    Base.CanQuery = false
+    Base.Transparency = 1
+    Base.Size = Vector3.new(12, 12, 0.025)
+    Base.CFrame = BaseCF
+    Base.Parent = Drawing
+
+    local Gui = Instance.new("SurfaceGui")
+    Gui.Name = "Graffiti"
+    Gui.Face = Enum.NormalId.Front
+    Gui.AlwaysOnTop = true
+    Gui.LightInfluence = 0
+    Gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+    Gui.PixelsPerStud = 35
+    Gui.ClipsDescendants = true
+    Gui.Parent = Base
+
+    local Mascara = Instance.new("Frame")
+    Mascara.Name = "Reveal"
+    Mascara.BackgroundTransparency = 1
+    Mascara.BorderSizePixel = 0
+    Mascara.Size = UDim2.fromScale(0, 1)
+    Mascara.Position = UDim2.fromScale(0, 0)
+    Mascara.ClipsDescendants = true
+    Mascara.Parent = Gui
+
+    local Glow = Instance.new("ImageLabel")
+    Glow.Name = "GreenGlow"
+    Glow.BackgroundTransparency = 1
+    Glow.BorderSizePixel = 0
+    Glow.Size = UDim2.fromScale(1.12, 1.12)
+    Glow.Position = UDim2.fromScale(-0.06, -0.06)
+    Glow.Image = IMAGE_ID
+    Glow.ImageColor3 = GREEN
+    Glow.ImageTransparency = 0.74
+    Glow.ScaleType = Enum.ScaleType.Fit
+    Glow.Parent = Mascara
+
+    local Image = Instance.new("ImageLabel")
+    Image.Name = "GraffitiImage"
+    Image.BackgroundTransparency = 1
+    Image.BorderSizePixel = 0
+    Image.Size = UDim2.fromScale(1, 1)
+    Image.Position = UDim2.fromScale(0, 0)
+    Image.Image = IMAGE_ID
+    Image.ImageColor3 = GREEN
+    Image.ImageTransparency = 0.03
+    Image.ScaleType = Enum.ScaleType.Fit
+    Image.Parent = Mascara
+
+    criarRitual(posicao, normal)
+
+    local Sound1 = Instance.new("Sound")
+    Sound1.Name = "DrawingStart"
+    Sound1.SoundId = SOUND_DRAW_START
+    Sound1.Volume = 2
+    Sound1.RollOffMode = Enum.RollOffMode.InverseTapered
+    Sound1.RollOffMinDistance = 5
+    Sound1.RollOffMaxDistance = 100
+    Sound1.Parent = Base
+    Sound1:Play()
+
+    Sound1.Ended:Connect(function()
+
+        if not Base.Parent then
+            return
+        end
+
+        local Sound2 = Instance.new("Sound")
+        Sound2.Name = "DrawingFinish"
+        Sound2.SoundId = SOUND_DRAW_FINISH
+        Sound2.Volume = 2
+        Sound2.RollOffMode = Enum.RollOffMode.InverseTapered
+        Sound2.RollOffMinDistance = 5
+        Sound2.RollOffMaxDistance = 100
+        Sound2.Parent = Base
+        Sound2:Play()
+
+        Debris:AddItem(Sound2, 10)
+    end)
+
+    local Reveal = TweenService:Create(
+        Mascara,
+        TweenInfo.new(
+            4,
+            Enum.EasingStyle.Linear,
+            Enum.EasingDirection.Out
+        ),
+        {
+            Size = UDim2.fromScale(1, 1)
+        }
+    )
+
+    Reveal:Play()
+
+    task.spawn(function()
+
+        while Drawing.Parent and Desenhando do
+
+            if uninstallMode == true then
+                removerPencil()
+                return
+            end
+
+            task.wait(0.05)
+        end
+    end)
+
+    Reveal.Completed:Wait()
+
+    if not Drawing.Parent then
+        Desenhando = false
+        return
+    end
+
+    if uninstallMode == true then
+        removerPencil()
+        return
+    end
+
+    local FinalRitual = criarRitual(
+        posicao + normal * 0.05,
+        normal
+    )
+
+    if typeof(showUninstallButton) == "function" then
+        showUninstallButton()
+    elseif typeof(_G.showUninstallButton) == "function" then
+        _G.showUninstallButton()
+    elseif typeof(_G.TriggerA90Uninstall) == "function" then
+        _G.TriggerA90Uninstall()
+    end
+
+    task.wait(0.35)
+
+    TweenService:Create(
+        Image,
+        TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            ImageTransparency = 1
+        }
+    ):Play()
+
+    TweenService:Create(
+        Glow,
+        TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            ImageTransparency = 1
+        }
+    ):Play()
+
+    task.wait(1.15)
+
+    if Drawing then
+        Drawing:Destroy()
+    end
+
+    if UltimoDesenho == Drawing then
+        UltimoDesenho = nil
+    end
+
+    Desenhando = false
+end
+
+UserInputService.InputBegan:Connect(function(Input)
+
+    if Input.UserInputType ~= Enum.UserInputType.Keyboard then
+        return
+    end
+
+    if Input.KeyCode ~= Enum.KeyCode.R then
+        return
+    end
+
+    if not PencilCriado then
+        return
+    end
+
+    DespawnManual = true
+    removerPencil()
+end)
+
+task.spawn(function()
+
+    while true do
+
+        local AtualDownload = downloadCompleted == true
+        local AtualUninstall = uninstallMode == true
+
+        if AtualUninstall then
+
+            DespawnManual = true
+
+            if PencilCriado then
+                removerPencil()
+            end
+
+        elseif not AtualDownload then
+
+            DespawnManual = false
+
+            if PencilCriado then
+                removerPencil()
+            end
+
+        elseif AtualDownload and not UltimoDownload then
+
+            DespawnManual = false
+            criarPencil()
+
+        elseif AtualDownload and not DespawnManual then
+
+            if not PencilCriado then
+                criarPencil()
+            end
+        end
+
+        UltimoDownload = AtualDownload
+
+        task.wait(0.1)
+    end
+end)
 
     if TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
         TextChatService.MessageReceived:Connect(function(msg)
