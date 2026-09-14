@@ -60,6 +60,7 @@ local playerHP            = 100
 local maxHP               = 100
 local backgroundEventsActive = false
 local backgroundEventsThread = nil
+local downloadCompleted   = false
 
 local activeSounds = {}
 
@@ -2430,6 +2431,11 @@ end
 local function setupChatCommand()
     local function checkMessage(text)
         if not chatCommandEnabled then return end
+
+    if not downloadCompleted then
+        return
+    end
+
         local lower = text:lower():gsub("^%s+", ""):gsub("%s+$", "")
         if lower == "a90/uninstall" then
             showUninstallButton()
@@ -2626,6 +2632,7 @@ local function finishDownloading()
 end
 
 local function onDownloadButtonClicked()
+downloadCompleted = true
     if buttonClicked then return end
     buttonClicked = true
 
@@ -2715,6 +2722,7 @@ local function onDownloadButtonClicked()
         end)
     end)
 end
+
 
 downloadBtn.MouseButton1Click:Connect(onDownloadButtonClicked)
 
