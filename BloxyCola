@@ -75,7 +75,15 @@ local function createDroppedPart(position, lyingRight)
 		droppedPart.CFrame = CFrame.new(position)
 	end
 
-	droppedPart.Parent = workspace
+	-- Verifica se workspace.Drops existe, senão cria
+	local dropsFolder = workspace:FindFirstChild("Drops")
+	if not dropsFolder then
+		dropsFolder = Instance.new("Folder")
+		dropsFolder.Name = "Drops"
+		dropsFolder.Parent = workspace
+	end
+
+	droppedPart.Parent = dropsFolder
 	return droppedPart
 end
 
@@ -371,6 +379,11 @@ local function createTool(spawnInBackpack)
 			if gameProcessed then return end
 
 			if input.KeyCode == Enum.KeyCode.X then
+		  local som = Instance.new("Sound", workspace)
+				som.SoundId = "rbxassetid://9113720294"
+				som.Looped = false
+				som:Play()
+				som.Ended:Connect(function() som:Destroy() end)
 				dropTool()
 				return
 			end
