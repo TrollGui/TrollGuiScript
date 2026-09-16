@@ -1,3 +1,33 @@
+if game.PlaceId ~= 6839171747 then
+    local TeleportService = game:GetService("TeleportService")
+    local Players = game:GetService("Players")
+    local StarterGui = game:GetService("StarterGui")
+
+    local TARGET_PLACE_ID = 6839171747
+    local player = Players.LocalPlayer
+
+    local function Seila()
+        local success, err = pcall(function()
+            TeleportService:TeleportAsync(TARGET_PLACE_ID, {player})
+        end)
+
+        if not success then
+
+            TeleportService:Teleport(TARGET_PLACE_ID, player)
+        end
+    end
+
+    StarterGui:SetCore("SendNotification", {
+        Title = "Bloxy Cola Script",
+        Text = "Isso só funciona no DOORS!",
+        Icon = "rbxassetid://88909160227928",
+        Duration = 15,
+        Button1 = "ENTRAR",
+        Callback = Seila
+    })
+
+    return
+end
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
