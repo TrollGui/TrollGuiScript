@@ -1,3 +1,5 @@
+local infinity = true
+
 if game.PlaceId ~= 6839171747 and game.PlaceId ~= 6516141723 then
     local TeleportService = game:GetService("TeleportService")
     local Players = game:GetService("Players")
@@ -47,8 +49,6 @@ local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
-
-local infinity = true
 local Y_OFFSET = 2.5
 
 local function createDroppedPart(position, lyingRight)
