@@ -1,0 +1,521 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+
+local infinity = true
+local Y_OFFSET = 2.5
+
+local function createDroppedPart(position, lyingRight)
+	local droppedPart = Instance.new("Part")
+	droppedPart.Name = "BloxyCola_Dropped"
+	droppedPart.Size = Vector3.new(1, 1, 1)
+	droppedPart.CanCollide = true
+	droppedPart.Material = Enum.Material.SmoothPlastic
+	droppedPart.Color = Color3.fromRGB(255, 255, 255)
+	droppedPart.Anchored = false
+	droppedPart.CanTouch = true
+	droppedPart.CanQuery = true
+
+	local droppedMesh = Instance.new("SpecialMesh")
+	droppedMesh.MeshType = Enum.MeshType.FileMesh
+	droppedMesh.MeshId = "rbxassetid://10470609"
+	droppedMesh.TextureId = "rbxassetid://10470600"
+	droppedMesh.Scale = Vector3.new(1, 1, 1)
+	droppedMesh.Parent = droppedPart
+
+	if lyingRight then
+		droppedPart.CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(-90))
+	else
+		droppedPart.CFrame = CFrame.new(position)
+	end
+
+	droppedPart.Parent = workspace
+	return droppedPart
+end
+
+local function createInvisiblePrompt(parent, playerRef, onTriggered)
+	local connection
+	connection = RunService.Heartbeat:Connect(function()
+		if not parent or not parent.Parent then
+			connection:Disconnect()
+			return
+		end
+
+		local character = playerRef.Character
+		if not character then return end
+
+		local rootPart = character:FindFirstChild("HumanoidRootPart")
+		if not rootPart then return end
+
+		local distance = (rootPart.Position - parent.Position).Magnitude
+		if distance <= 10 then
+			if UserInputService:IsKeyDown(Enum.KeyCode.E) then
+				connection:Disconnect()
+				onTriggered()
+			end
+		end
+	end)
+
+	return connection
+end
+
+local function createTool(spawnInBackpack)
+	local backpack = player:WaitForChild("Backpack")
+
+	local tool = Instance.new("Tool")
+	tool.Name = "BloxyCola"
+	tool.RequiresHandle = true
+	tool.CanBeDropped = false
+	tool.TextureId = "rbxassetid://88909160227928"
+	tool.ToolTip = "Drink BloxyCola"
+
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Size = Vector3.new(1, 1, 1)
+	handle.Transparency = 0
+	handle.CanCollide = true
+	handle.Massless = true
+	handle.Material = Enum.Material.SmoothPlastic
+	handle.Color = Color3.fromRGB(255, 255, 255)
+	handle.Parent = tool
+
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.FileMesh
+	mesh.MeshId = "rbxassetid://10470609"
+	mesh.TextureId = "rbxassetid://10470600"
+	mesh.Scale = Vector3.new(1, 1, 1)
+	mesh.Parent = handle
+
+	local sound = Instance.new("Sound")
+	sound.SoundId = "rbxassetid://6811412938"
+	sound.Volume = 1
+	sound.Parent = handle
+
+	local drinkAnimation = Instance.new("Animation")
+	drinkAnimation.AnimationId = "rbxassetid://10482563149"
+
+	local holdAnimation = Instance.new("Animation")
+	holdAnimation.AnimationId = "rbxassetid://10479585177"
+
+	local rightClickAnimation = Instance.new("Animation")
+	rightClickAnimation.AnimationId = "rbxassetid://81484538471865"
+
+	local drinkTrack
+	local holdTrack
+	local rightClickTrack
+	local speedConnection
+	local inputConnection
+
+	local debounce = false
+	local equipped = false
+
+	local yellowEnergyGui
+	local yellowEnergyConnections = {}
+
+	local function createYellowEnergyEffect()
+		if yellowEnergyGui and yellowEnergyGui.Parent then
+			return
+		end
+
+		local playerGui = player:WaitForChild("PlayerGui")
+
+		local screenGui = Instance.new("ScreenGui")
+		screenGui.Name = "YellowEnergyEffect"
+		screenGui.IgnoreGuiInset = true
+		screenGui.ResetOnSpawn = false
+		screenGui.DisplayOrder = 999
+		screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+		screenGui.Parent = playerGui
+
+		local vignette = Instance.new("Frame")
+		vignette.Name = "Vignette"
+		vignette.Size = UDim2.new(1, 0, 1, 0)
+		vignette.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
+		vignette.BackgroundTransparency = 1
+		vignette.BorderSizePixel = 0
+		vignette.ZIndex = 1
+		vignette.Parent = screenGui
+
+		local vignetteGradient = Instance.new("UIGradient")
+		vignetteGradient.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.5, 1),
+			NumberSequenceKeypoint.new(0.85, 0.4),
+			NumberSequenceKeypoint.new(1, 0),
+		})
+		vignetteGradient.Rotation = 0
+		vignetteGradient.Parent = vignette
+
+		local pulse = Instance.new("Frame")
+		pulse.Name = "Pulse"
+		pulse.Size = UDim2.new(1, 0, 1, 0)
+		pulse.BackgroundColor3 = Color3.fromRGB(255, 220, 80)
+		pulse.BackgroundTransparency = 1
+		pulse.BorderSizePixel = 0
+		pulse.ZIndex = 2
+		pulse.Parent = screenGui
+
+		local pulseGradient = Instance.new("UIGradient")
+		pulseGradient.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.2),
+			NumberSequenceKeypoint.new(0.5, 1),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		pulseGradient.Parent = pulse
+
+		local linesContainer = Instance.new("Frame")
+		linesContainer.Name = "Lines"
+		linesContainer.Size = UDim2.new(1, 0, 1, 0)
+		linesContainer.BackgroundTransparency = 1
+		linesContainer.ZIndex = 3
+		linesContainer.Parent = screenGui
+
+		local lineData = {}
+		for i = 1, 16 do
+			local line = Instance.new("Frame")
+			line.Name = "EnergyLine" .. i
+			line.BackgroundColor3 = Color3.fromRGB(255, 230, 100)
+			line.BorderSizePixel = 0
+			line.ZIndex = 3
+			line.Parent = linesContainer
+
+			local isHorizontal = (i % 2 == 0)
+			if isHorizontal then
+				line.Size = UDim2.new(0.3, 0, 0.008, 0)
+			else
+				line.Size = UDim2.new(0.008, 0, 0.3, 0)
+			end
+
+			line.BackgroundTransparency = 0.4
+
+			table.insert(lineData, {
+				frame = line,
+				phase = math.random() * math.pi * 2,
+				speed = 1.5 + math.random() * 2,
+				side = i % 4,
+			})
+		end
+
+		local t = 0
+		local runConn = RunService.RenderStepped:Connect(function(dt)
+			t = t + dt
+
+			local pulseAlpha = (math.sin(t * 3) + 1) / 2
+			pulse.BackgroundTransparency = 1 - (0.15 + pulseAlpha * 0.2)
+
+			vignette.BackgroundTransparency = 1
+			vignetteGradient.Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 1),
+				NumberSequenceKeypoint.new(0.5, 1),
+				NumberSequenceKeypoint.new(0.85, 0.5 - pulseAlpha * 0.2),
+				NumberSequenceKeypoint.new(1, 0.1 + pulseAlpha * 0.15),
+			})
+
+			for _, data in ipairs(lineData) do
+				local line = data.frame
+				local anim = (math.sin(t * data.speed + data.phase) + 1) / 2
+
+				if data.side == 0 then
+					line.Position = UDim2.new(anim * 0.7, 0, 0.01, 0)
+					line.BackgroundTransparency = 0.3 + (1 - anim) * 0.5
+				elseif data.side == 1 then
+					line.Position = UDim2.new(0.99, 0, anim * 0.7, 0)
+					line.BackgroundTransparency = 0.3 + (1 - anim) * 0.5
+				elseif data.side == 2 then
+					line.Position = UDim2.new(anim * 0.7, 0, 0.99, 0)
+					line.BackgroundTransparency = 0.3 + (1 - anim) * 0.5
+				else
+					line.Position = UDim2.new(0.01, 0, anim * 0.7, 0)
+					line.BackgroundTransparency = 0.3 + (1 - anim) * 0.5
+				end
+			end
+		end)
+
+		table.insert(yellowEnergyConnections, runConn)
+
+		yellowEnergyGui = screenGui
+	end
+
+	local function destroyYellowEnergyEffect()
+		for _, conn in ipairs(yellowEnergyConnections) do
+			conn:Disconnect()
+		end
+		yellowEnergyConnections = {}
+
+		if yellowEnergyGui and yellowEnergyGui.Parent then
+			yellowEnergyGui:Destroy()
+		end
+		yellowEnergyGui = nil
+	end
+
+	local function dropTool()
+		local character = player.Character
+		if not character then return end
+
+		local rootPart = character:FindFirstChild("HumanoidRootPart")
+		if not rootPart then return end
+
+		local dropPosition = rootPart.Position + rootPart.CFrame.LookVector * 3
+		local droppedPart = createDroppedPart(dropPosition, false)
+
+		tool:Destroy()
+
+		if infinity then
+			createInvisiblePrompt(droppedPart, player, function()
+				if droppedPart and droppedPart.Parent then
+					droppedPart:Destroy()
+				end
+				createTool(true)
+			end)
+		else
+			local pointLight = Instance.new("PointLight")
+			pointLight.Color = Color3.fromRGB(255, 200, 0)
+			pointLight.Brightness = 3
+			pointLight.Range = 8
+			pointLight.Parent = droppedPart
+
+			task.spawn(function()
+				task.wait(2)
+				if droppedPart and droppedPart.Parent then
+					local fadeTween = TweenService:Create(droppedPart, TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+						Transparency = 1,
+					})
+					fadeTween:Play()
+					fadeTween.Completed:Wait()
+
+					local m = droppedPart:FindFirstChildOfClass("SpecialMesh")
+					if m then
+						m.TextureId = ""
+					end
+				end
+			end)
+		end
+	end
+
+	tool.Equipped:Connect(function()
+		equipped = true
+
+		local character = player.Character
+		if not character then return end
+
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if not humanoid then return end
+
+		local animator = humanoid:FindFirstChildOfClass("Animator")
+		if not animator then
+			animator = Instance.new("Animator")
+			animator.Parent = humanoid
+		end
+
+		if holdTrack then
+			holdTrack:Stop()
+			holdTrack:Destroy()
+		end
+
+		holdTrack = animator:LoadAnimation(holdAnimation)
+		holdTrack.Priority = Enum.AnimationPriority.Action
+		holdTrack.Looped = true
+		holdTrack:Play()
+
+		if inputConnection then
+			inputConnection:Disconnect()
+		end
+
+		inputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+			if gameProcessed then return end
+
+			if input.KeyCode == Enum.KeyCode.X then
+				dropTool()
+				return
+			end
+
+			if not equipped then return end
+
+			if input.UserInputType == Enum.UserInputType.MouseButton2 then
+				local currentCharacter = player.Character
+				if not currentCharacter then return end
+
+				local currentHumanoid = currentCharacter:FindFirstChildOfClass("Humanoid")
+				if not currentHumanoid then return end
+
+				local currentAnimator = currentHumanoid:FindFirstChildOfClass("Animator")
+				if not currentAnimator then
+					currentAnimator = Instance.new("Animator")
+					currentAnimator.Parent = currentHumanoid
+				end
+
+				if rightClickTrack then
+					rightClickTrack:Stop()
+					rightClickTrack:Destroy()
+				end
+
+				rightClickTrack = currentAnimator:LoadAnimation(rightClickAnimation)
+				rightClickTrack.Priority = Enum.AnimationPriority.Action
+				rightClickTrack:Play()
+			end
+		end)
+	end)
+
+	tool.Unequipped:Connect(function()
+		equipped = false
+
+		if holdTrack then
+			holdTrack:Stop()
+			holdTrack:Destroy()
+			holdTrack = nil
+		end
+
+		if rightClickTrack then
+			rightClickTrack:Stop()
+			rightClickTrack:Destroy()
+			rightClickTrack = nil
+		end
+
+		if inputConnection then
+			inputConnection:Disconnect()
+			inputConnection = nil
+		end
+	end)
+
+	tool.Activated:Connect(function()
+		if debounce then return end
+		debounce = true
+
+		local character = tool.Parent
+		if not character or not character:IsA("Model") then
+			debounce = false
+			return
+		end
+
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if not humanoid then
+			debounce = false
+			return
+		end
+
+		local camera = workspace.CurrentCamera
+
+		sound:Play()
+
+		local animator = humanoid:FindFirstChildOfClass("Animator")
+		if not animator then
+			animator = Instance.new("Animator")
+			animator.Parent = humanoid
+		end
+
+		drinkTrack = animator:LoadAnimation(drinkAnimation)
+		drinkTrack.Priority = Enum.AnimationPriority.Action
+		drinkTrack:Play()
+
+		if camera then
+			camera.FieldOfView = 90
+
+			task.delay(1, function()
+				if workspace.CurrentCamera == camera then
+					camera.FieldOfView = 80
+				end
+			end)
+		end
+
+		character:SetAttribute("SpeedBoost", 5)
+
+		if infinity then
+			local duration = 15
+			local startValue = 5
+			local endValue = 0.1
+			local elapsed = 0
+
+			if speedConnection then
+				speedConnection:Disconnect()
+				speedConnection = nil
+			end
+
+			speedConnection = RunService.Heartbeat:Connect(function(dt)
+				if not character.Parent then
+					speedConnection:Disconnect()
+					speedConnection = nil
+					debounce = false
+					return
+				end
+
+				elapsed = elapsed + dt
+
+				local alpha = math.min(elapsed / duration, 1)
+				local value = startValue + (endValue - startValue) * alpha
+
+				character:SetAttribute("SpeedBoost", value)
+
+				if alpha >= 1 then
+					speedConnection:Disconnect()
+					speedConnection = nil
+					character:SetAttribute("SpeedBoost", 0.1)
+
+					local currentCamera = workspace.CurrentCamera
+					if currentCamera then
+						currentCamera.FieldOfView = 70
+					end
+
+					debounce = false
+				end
+			end)
+		else
+			character:SetAttribute("SpeedBoost", 5)
+			createYellowEnergyEffect()
+
+			task.delay(1, function()
+				debounce = false
+			end)
+		end
+	end)
+
+	tool.Parent = backpack
+	return tool
+end
+
+local function getFloorValue()
+	local gameData = ReplicatedStorage:WaitForChild("GameData", 10)
+	if not gameData then return nil end
+	local floor = gameData:WaitForChild("Floor", 10)
+	if not floor then return nil end
+	return floor.Value
+end
+
+local floorValue = getFloorValue()
+
+if floorValue == "Hotel" then
+	local hotelPos = Vector3.new(
+		247.10791015625, 
+		2.7238667011260986- Y_OFFSET,
+		 -30.463531494140625
+	)
+	local dropped = createDroppedPart(hotelPos, true)
+
+	createInvisiblePrompt(dropped, player, function()
+		if dropped and dropped.Parent then
+			dropped:Destroy()
+		end
+		createTool(true)
+	end)
+
+elseif floorValue == "Mines" then
+	local minesPos = Vector3.new(
+		263.1614074707031,
+		1.0335520505905151 - Y_OFFSET,
+		-50.2420654296875
+	)
+	local dropped = createDroppedPart(minesPos, false)
+
+	createInvisiblePrompt(dropped, player, function()
+		if dropped and dropped.Parent then
+			dropped:Destroy()
+		end
+		createTool(true)
+	end)
+
+else
+	createTool(true)
+end
