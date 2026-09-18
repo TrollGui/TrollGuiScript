@@ -8055,6 +8055,7 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "TrollGuiInvisible"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
+gui.DisplayOrder = 999999
 gui.Parent = playerGui
 
 local button = Instance.new("TextButton")
@@ -8073,129 +8074,154 @@ button.Parent = gui
 local mouseReleased = false
 local cameraLocked = false
 local cameraConnection = nil
-local currentCamera = workspace.CurrentCamera
 
-local originalMouseBehavior = UserInputService.MouseBehavior
-local originalMouseIconEnabled = UserInputService.MouseIconEnabled
-local originalCameraMode = player.CameraMode
+local function disconnectCamera()
+    cameraLocked = false
 
-local function releaseMouse(released)
-    mouseReleased = released
-
-    if released then
-        button.Visible = true
-        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-        UserInputService.MouseIconEnabled = true
-        GuiService.MouseIconEnabled = true
-        
-        if cameraLocked then
-            cameraLocked = false
-            if cameraConnection then
-                cameraConnection:Disconnect()
-                cameraConnection = nil
-            end
-        end
-    else
-        button.Visible = false
-        UserInputService.MouseBehavior = originalMouseBehavior
-        UserInputService.MouseIconEnabled = originalMouseIconEnabled
-        GuiService.MouseIconEnabled = originalMouseIconEnabled
-        player.CameraMode = originalCameraMode
-        
-        if cameraLocked then
-            cameraLocked = false
-            if cameraConnection then
-                cameraConnection:Disconnect()
-                cameraConnection = nil
-            end
-        end
-    end
-end
-
-local function lockCamera()
-    if cameraLocked then return end
-    cameraLocked = true
-    
     if cameraConnection then
         cameraConnection:Disconnect()
         cameraConnection = nil
     end
-    
-    cameraConnection = RunService.RenderStepped:Connect(function()
-        if not cameraLocked then
-            if cameraConnection then
-                cameraConnection:Disconnect()
-                cameraConnection = nil
-            end
-            return
-        end
-        
-        if currentCamera and currentCamera.CameraSubject and currentCamera.CameraSubject:IsA("Model") then
-            local character = currentCamera.CameraSubject
-            if character and character.PrimaryPart then
-                local rootPart = character.PrimaryPart
-                local lookVector = currentCamera.CFrame.LookVector
-                local position = rootPart.Position + Vector3.new(0, 2, 0)
-                local targetCFrame = CFrame.lookAt(position, position + lookVector)
-                currentCamera.CFrame = targetCFrame
+end
+
+local function releaseMouse()
+    mouseReleased = true
+    button.Visible = true
+
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    UserInputService.MouseIconEnabled = true
+    GuiService.MouseIconEnabled = true
+end
+
+local function restoreMouse()
+    mouseReleased = false
+    button.Visible = false
+
+    disconnectCamera()
+
+    task.defer(function()
+        if not mouseReleased then
+            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+            UserInputService.MouseIconEnabled = true
+            GuiService.MouseIconEnabled = true
+
+            task.wait(0.1)
+
+            if not mouseReleased then
+                UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
             end
         end
     end)
 end
 
-local function unlockCamera()
-    if cameraConnection then
-        cameraConnection:Disconnect()
-        cameraConnection = nil
+local function lockCamera()
+    disconnectCamera()
+
+    cameraLocked = true
+    local camera = workspace.CurrentCamera
+
+    cameraConnection = RunService.RenderStepped:Connect(function()
+        if not cameraLocked or not mouseReleased then
+            disconnectCamera()
+            return
+        end
+
+        camera = workspace.CurrentCamera
+
+        if not camera then
+            return
+        end
+
+        local subject = camera.CameraSubject
+
+        if subject and subject:IsA("Humanoid") then
+            local character = subject.Parent
+
+            if character and character:IsA("Model") then
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+
+                if rootPart then
+                    local lookVector = camera.CFrame.LookVector
+                    local position = rootPart.Position + Vector3.new(0, 2, 0)
+
+                    camera.CFrame = CFrame.lookAt(
+                        position,
+                        position + lookVector
+                    )
+                end
+            end
+        elseif subject and subject:IsA("BasePart") then
+            local position = subject.Position + Vector3.new(0, 2, 0)
+            local lookVector = camera.CFrame.LookVector
+
+            camera.CFrame = CFrame.lookAt(
+                position,
+                position + lookVector
+            )
+        end
+    end)
+end
+
+local function handleAltPressed()
+    if mouseReleased then
+        return
     end
-    cameraLocked = false
+
+    releaseMouse()
+    lockCamera()
+end
+
+local function handleAltReleased()
+    if not mouseReleased then
+        return
+    end
+
+    restoreMouse()
 end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then
-        if not mouseReleased then
-            releaseMouse(true)
-            lockCamera()
-        end
+    if input.KeyCode == Enum.KeyCode.LeftAlt
+        or input.KeyCode == Enum.KeyCode.RightAlt then
+
+        handleAltPressed()
+        return
     end
-    
+
     if input.KeyCode == Enum.KeyCode.F and not mouseReleased then
+        local camera = workspace.CurrentCamera
         local character = player.Character
-        if character and character.PrimaryPart then
-            local rootPart = character.PrimaryPart
-            local currentCFrame = currentCamera.CFrame
-            local lookVector = currentCFrame.LookVector
-            local position = rootPart.Position + Vector3.new(0, 2, 0)
-            currentCamera.CFrame = CFrame.lookAt(position, position + lookVector)
-            unlockCamera()
+
+        if camera and character then
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+
+            if rootPart then
+                local lookVector = camera.CFrame.LookVector
+                local position = rootPart.Position + Vector3.new(0, 2, 0)
+
+                camera.CFrame = CFrame.lookAt(
+                    position,
+                    position + lookVector
+                )
+
+                disconnectCamera()
+            end
         end
     end
 end)
 
-UserInputService.InputEnded:Connect(function(input, gameProcessed)
-    if input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then
-        if mouseReleased then
-            releaseMouse(false)
-            unlockCamera()
-        end
-    end
-end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.LeftAlt
+        or input.KeyCode == Enum.KeyCode.RightAlt then
 
-RunService.RenderStepped:Connect(function()
-    if mouseReleased then
-        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-        UserInputService.MouseIconEnabled = true
-        GuiService.MouseIconEnabled = true
+        handleAltReleased()
     end
 end)
 
 player.CharacterAdded:Connect(function()
-    if cameraConnection then
-        cameraConnection:Disconnect()
-        cameraConnection = nil
-    end
-    cameraLocked = false
+    disconnectCamera()
+
     if mouseReleased then
-        releaseMouse(false)
+        mouseReleased = false
+        button.Visible = false
     end
 end)
