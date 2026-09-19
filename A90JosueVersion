@@ -10,7 +10,7 @@ local PlayerGui = Player:WaitForChild("PlayerGui")
 
 local ENABLE_RESPAWN = true
 local SOUND_APPEAR_LEAD_TIME = 0.5
-local INITIAL_DELAY = 1
+local INITIAL_DELAY = 14
 local MIN_INTERVAL = 1
 local MAX_INTERVAL = 50
 local DAMAGE = 40
