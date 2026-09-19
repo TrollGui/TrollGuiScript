@@ -8,7 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
-local ENABLE_RESPAWN = false
+local ENABLE_RESPAWN = true
 local SOUND_APPEAR_LEAD_TIME = 0.5
 local INITIAL_DELAY = 1
 local MIN_INTERVAL = 1
