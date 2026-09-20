@@ -6053,199 +6053,399 @@ ReviveFree = {
         end
     end)()
 },
-BypassNoclipAnticheat = {
-Nome = "Bypass Noclip Anticheat",
-IsToggle = true,
-Repeat = false,
-Script = function(state)
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-    if not player then return end
+BypassAnticheat = {
+    Nome = "Bypass Anticheat",
+    IsToggle = true,
+    Repeat = false,
+    Script = function(state)
+        local Players = game:GetService("Players")
+        local RunService = game:GetService("RunService")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local UserInputService = game:GetService("UserInputService")
 
-    getgenv().GoThroughData = getgenv().GoThroughData or {
-        ConnNoClip = nil,
-        ConnInputBegan = nil,
-        ConnInputEnded = nil,
-        ConnFocusLost = nil,
-        ActiveState = false,
-        IsHoldingV = false,
-        OriginalCollision = {},
-        OriginalWalkSpeed = nil,
-        OriginalJumpPower = nil,
-        OriginalAutoRotate = nil
-    }
+        local LocalPlayer = Players.LocalPlayer
+        if not LocalPlayer then return end
 
-    local data = getgenv().GoThroughData
-    data.ActiveState = state
+        local REAL_WALKSPEED  = 16
+        local BOOST_WALKSPEED = 16
+        local CROUCH_INTERVAL = 0.1
 
-    local function getCharacter()
-        return player.Character
-    end
+        getgenv().BypassData = getgenv().BypassData or {
 
-    local function getHumanoid()
-        local character = getCharacter()
-        return character and character:FindFirstChildOfClass("Humanoid")
-    end
+            Character = nil,
+            Humanoid = nil,
+            RootPart = nil,
+            Collision = nil,
+            LastCrouchFire = 0,
+            accum = 0,
+            HeartbeatConn = nil,
+            CharAddedConn = nil,
+            WalkSpeedConn = nil,
 
-    local function getRootPart()
-        local character = getCharacter()
-        return character and character:FindFirstChild("HumanoidRootPart")
-    end
+            oldIndex = nil,
+            oldNewIndex = nil,
+            oldNamecall = nil,
+            mt = nil,
 
-    local function restoreCollision()
-        for part, originalValue in pairs(data.OriginalCollision) do
-            if part and part.Parent then
+            ConnNoClip = nil,
+            ConnInputBegan = nil,
+            ConnInputEnded = nil,
+            ConnFocusLost = nil,
+            ActiveState = false,
+            IsHoldingV = false,
+            OriginalCollision = {},
+            OriginalWalkSpeed = nil,
+            OriginalJumpPower = nil,
+            OriginalAutoRotate = nil,
+        }
+
+        local data = getgenv().BypassData
+        data.ActiveState = state
+
+        local function getCharacter()
+            return LocalPlayer.Character
+        end
+
+        local function getHumanoid()
+            local character = getCharacter()
+            return character and character:FindFirstChildOfClass("Humanoid")
+        end
+
+        local function getRootPart()
+            local character = getCharacter()
+            return character and character:FindFirstChild("HumanoidRootPart")
+        end
+
+        local function findCrouchRemote()
+            for _, name in ipairs({"RemotesFolder", "EntityInfo", "Bricks", "Remotes"}) do
+                local f = ReplicatedStorage:FindFirstChild(name)
+                if f then
+                    local c = f:FindFirstChild("Crouch")
+                    if c and c:IsA("RemoteEvent") then return c end
+                end
+            end
+            return nil
+        end
+
+        local CrouchRemote = findCrouchRemote()
+
+        local function installSpeedHooks()
+            if not hookmetamethod or not getrawmetatable then return end
+            if data.oldIndex then return end
+
+            local mt = getrawmetatable(game)
+            data.mt = mt
+            data.oldIndex    = mt.__index
+            data.oldNewIndex = mt.__newindex
+            data.oldNamecall = mt.__namecall
+            setreadonly(mt, false)
+
+            mt.__namecall = newcclosure(function(self, ...)
+                local method = getnamecallmethod()
+                if self == CrouchRemote and method == "FireServer" then
+                    local args = {...}
+                    args[1] = true
+                    args[2] = true
+                    return data.oldNamecall(self, table.unpack(args))
+                end
+                return data.oldNamecall(self, ...)
+            end)
+
+            mt.__index = newcclosure(function(self, key)
+                if key == "WalkSpeed" and self == data.Humanoid then
+                    return REAL_WALKSPEED
+                end
+                return data.oldIndex(self, key)
+            end)
+
+            mt.__newindex = newcclosure(function(self, key, value)
+                if key == "WalkSpeed" and self == data.Humanoid then
+                    if type(value) == "number" and value <= REAL_WALKSPEED then
+                        return data.oldNewIndex(self, key, BOOST_WALKSPEED)
+                    end
+                end
+                return data.oldNewIndex(self, key, value)
+            end)
+
+            setreadonly(mt, true)
+        end
+
+        local function uninstallSpeedHooks()
+            if not data.mt then return end
+            pcall(function()
+                setreadonly(data.mt, false)
+                if data.oldIndex then data.mt.__index = data.oldIndex end
+                if data.oldNewIndex then data.mt.__newindex = data.oldNewIndex end
+                if data.oldNamecall then data.mt.__namecall = data.oldNamecall end
+                setreadonly(data.mt, true)
+            end)
+            data.oldIndex = nil
+            data.oldNewIndex = nil
+            data.oldNamecall = nil
+            data.mt = nil
+        end
+
+        local function setupCharacter(char)
+            data.Character = char
+            data.Humanoid  = char:WaitForChild("Humanoid", 10)
+            data.RootPart  = char:WaitForChild("HumanoidRootPart", 10)
+            if not data.Humanoid or not data.RootPart then return end
+
+            data.Collision = char:FindFirstChild("Collision")
+
+            if data.oldNewIndex then
+                data.oldNewIndex(data.Humanoid, "WalkSpeed", BOOST_WALKSPEED)
+            else
+                data.Humanoid.WalkSpeed = BOOST_WALKSPEED
+            end
+
+            if data.WalkSpeedConn then data.WalkSpeedConn:Disconnect() end
+            data.WalkSpeedConn = data.Humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+                local real = data.oldIndex and data.oldIndex(data.Humanoid, "WalkSpeed") or data.Humanoid.WalkSpeed
+                if math.abs(real - REAL_WALKSPEED) < 1 and data.oldNewIndex then
+                    data.oldNewIndex(data.Humanoid, "WalkSpeed", BOOST_WALKSPEED)
+                end
+            end)
+
+            if data.Collision then
+                data.Collision.CanCollide = false
+                local cc = data.Collision:FindFirstChild("CollisionCrouch")
+                if cc then cc.CanCollide = false end
+            end
+        end
+
+        local function startSpeedBypass()
+            installSpeedHooks()
+
+            if data.HeartbeatConn then data.HeartbeatConn:Disconnect() end
+            data.HeartbeatConn = RunService.Heartbeat:Connect(function(dt)
+                if not data.Character or not data.Character.Parent then return end
+                if not data.Humanoid or data.Humanoid.Health <= 0 then return end
+                if not data.RootPart or not data.RootPart.Parent then return end
+
+                if data.Collision and data.Collision.Parent then
+                    pcall(function()
+                        data.Collision.CanCollide = false
+                        data.Collision.Position = data.RootPart.Position + Vector3.new(0, 0.18, 0)
+                    end)
+                end
+
+                data.accum = data.accum + dt
+                if CrouchRemote and data.accum >= CROUCH_INTERVAL then
+                    data.accum = 0
+                    if tick() - data.LastCrouchFire > 0.1 then
+                        pcall(function() CrouchRemote:FireServer(true, true) end)
+                        data.LastCrouchFire = tick()
+                    end
+                end
+            end)
+
+            if LocalPlayer.Character then
+                task.spawn(setupCharacter, LocalPlayer.Character)
+            end
+
+            if data.CharAddedConn then data.CharAddedConn:Disconnect() end
+            data.CharAddedConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
+                task.wait(0.5)
+                if data.ActiveState then
+                    setupCharacter(newChar)
+                end
+            end)
+        end
+
+        local function stopSpeedBypass()
+            if data.HeartbeatConn then
+                data.HeartbeatConn:Disconnect()
+                data.HeartbeatConn = nil
+            end
+            if data.CharAddedConn then
+                data.CharAddedConn:Disconnect()
+                data.CharAddedConn = nil
+            end
+            if data.WalkSpeedConn then
+                data.WalkSpeedConn:Disconnect()
+                data.WalkSpeedConn = nil
+            end
+
+            if data.Humanoid then
                 pcall(function()
-                    part.CanCollide = originalValue
+                    local real = data.oldIndex and data.oldIndex(data.Humanoid, "WalkSpeed") or REAL_WALKSPEED
+                    data.Humanoid.WalkSpeed = REAL_WALKSPEED
+                end)
+            end
+
+            uninstallSpeedHooks()
+
+            data.Character = nil
+            data.Humanoid = nil
+            data.RootPart = nil
+            data.Collision = nil
+        end
+
+        local function restoreCollision()
+            for part, originalValue in pairs(data.OriginalCollision) do
+                if part and part.Parent then
+                    pcall(function()
+                        part.CanCollide = originalValue
+                    end)
+                end
+            end
+            table.clear(data.OriginalCollision)
+        end
+
+        local function restoreMovement()
+            local humanoid = getHumanoid()
+            if humanoid then
+                if data.OriginalWalkSpeed ~= nil then
+                    humanoid.WalkSpeed = data.OriginalWalkSpeed
+                end
+                if data.OriginalJumpPower ~= nil then
+                    humanoid.JumpPower = data.OriginalJumpPower
+                end
+                if data.OriginalAutoRotate ~= nil then
+                    humanoid.AutoRotate = data.OriginalAutoRotate
+                end
+                humanoid:Move(Vector3.zero, true)
+            end
+            data.OriginalWalkSpeed = nil
+            data.OriginalJumpPower = nil
+            data.OriginalAutoRotate = nil
+        end
+
+        local function disableNoclip()
+            data.IsHoldingV = false
+            restoreCollision()
+            restoreMovement()
+        end
+
+        local function enableNoclip()
+            if not data.ActiveState or not data.IsHoldingV then
+                return
+            end
+
+            local character = getCharacter()
+            local humanoid = getHumanoid()
+            local rootPart = getRootPart()
+
+            if not character or not humanoid or not rootPart then
+                return
+            end
+
+            if data.OriginalWalkSpeed == nil then
+                data.OriginalWalkSpeed = humanoid.WalkSpeed
+            end
+            if data.OriginalJumpPower == nil then
+                data.OriginalJumpPower = humanoid.JumpPower
+            end
+            if data.OriginalAutoRotate == nil then
+                data.OriginalAutoRotate = humanoid.AutoRotate
+            end
+
+            humanoid.WalkSpeed = 0
+            humanoid.JumpPower = 0
+            humanoid.AutoRotate = false
+            humanoid:Move(Vector3.zero, true)
+
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    if data.OriginalCollision[part] == nil then
+                        data.OriginalCollision[part] = part.CanCollide
+                    end
+                    part.CanCollide = false
+                    part.Anchored = false
+                end
+            end
+
+            local humanoidState = humanoid:GetState()
+            if humanoidState == Enum.HumanoidStateType.Freefall
+                or humanoidState == Enum.HumanoidStateType.FallingDown then
+                rootPart.AssemblyLinearVelocity = Vector3.new(
+                    rootPart.AssemblyLinearVelocity.X,
+                    0,
+                    rootPart.AssemblyLinearVelocity.Z
+                )
+                rootPart.AssemblyAngularVelocity = Vector3.zero
+            end
+
+            rootPart.CFrame = rootPart.CFrame + (rootPart.CFrame.LookVector * 0.01)
+        end
+
+        local function startNoclip()
+            if not data.ConnInputBegan then
+                data.ConnInputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                    if gameProcessed then return end
+                    if input.KeyCode ~= Enum.KeyCode.V then return end
+                    if not data.ActiveState then return end
+                    data.IsHoldingV = true
+                end)
+            end
+
+            if not data.ConnInputEnded then
+                data.ConnInputEnded = UserInputService.InputEnded:Connect(function(input)
+                    if input.KeyCode ~= Enum.KeyCode.V then return end
+                    disableNoclip()
+                end)
+            end
+
+            if not data.ConnFocusLost then
+                data.ConnFocusLost = UserInputService.WindowFocusReleased:Connect(function()
+                    disableNoclip()
+                end)
+            end
+
+            if not data.ConnNoClip then
+                data.ConnNoClip = RunService.Stepped:Connect(function()
+                    if not data.ActiveState then
+                        if data.IsHoldingV or next(data.OriginalCollision) then
+                            disableNoclip()
+                        end
+                        return
+                    end
+
+                    if not UserInputService:IsKeyDown(Enum.KeyCode.V) then
+                        if data.IsHoldingV then
+                            disableNoclip()
+                        end
+                        return
+                    end
+
+                    data.IsHoldingV = true
+                    enableNoclip()
                 end)
             end
         end
 
-        table.clear(data.OriginalCollision)
-    end
-
-    local function restoreMovement()
-        local humanoid = getHumanoid()
-
-        if humanoid then
-            if data.OriginalWalkSpeed ~= nil then
-                humanoid.WalkSpeed = data.OriginalWalkSpeed
-            end
-
-            if data.OriginalJumpPower ~= nil then
-                humanoid.JumpPower = data.OriginalJumpPower
-            end
-
-            if data.OriginalAutoRotate ~= nil then
-                humanoid.AutoRotate = data.OriginalAutoRotate
-            end
-
-            humanoid:Move(Vector3.zero, true)
-        end
-
-        data.OriginalWalkSpeed = nil
-        data.OriginalJumpPower = nil
-        data.OriginalAutoRotate = nil
-    end
-
-    local function disableNoclip()
-        data.IsHoldingV = false
-        restoreCollision()
-        restoreMovement()
-    end
-
-    local function enableNoclip()
-        if not data.ActiveState or not data.IsHoldingV then
-            return
-        end
-
-        local character = getCharacter()
-        local humanoid = getHumanoid()
-        local rootPart = getRootPart()
-
-        if not character or not humanoid or not rootPart then
-            return
-        end
-
-        if data.OriginalWalkSpeed == nil then
-            data.OriginalWalkSpeed = humanoid.WalkSpeed
-        end
-
-        if data.OriginalJumpPower == nil then
-            data.OriginalJumpPower = humanoid.JumpPower
-        end
-
-        if data.OriginalAutoRotate == nil then
-            data.OriginalAutoRotate = humanoid.AutoRotate
-        end
-
-        humanoid.WalkSpeed = 0
-        humanoid.JumpPower = 0
-        humanoid.AutoRotate = false
-        humanoid:Move(Vector3.zero, true)
-
-        for _, part in ipairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                if data.OriginalCollision[part] == nil then
-                    data.OriginalCollision[part] = part.CanCollide
-                end
-
-                part.CanCollide = false
-                part.Anchored = false
-            end
-        end
-
-        local humanoidState = humanoid:GetState()
-
-        if humanoidState == Enum.HumanoidStateType.Freefall
-            or humanoidState == Enum.HumanoidStateType.FallingDown then
-
-            rootPart.AssemblyLinearVelocity = Vector3.new(
-                rootPart.AssemblyLinearVelocity.X,
-                0,
-                rootPart.AssemblyLinearVelocity.Z
-            )
-
-            rootPart.AssemblyAngularVelocity = Vector3.zero
-        end
-
-        rootPart.CFrame = rootPart.CFrame + (rootPart.CFrame.LookVector * 0.01)
-    end
-
-    if not data.ConnInputBegan then
-        data.ConnInputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            if input.KeyCode ~= Enum.KeyCode.V then return end
-            if not data.ActiveState then return end
-
-            data.IsHoldingV = true
-        end)
-    end
-
-    if not data.ConnInputEnded then
-        data.ConnInputEnded = UserInputService.InputEnded:Connect(function(input)
-            if input.KeyCode ~= Enum.KeyCode.V then return end
-
+        local function stopNoclip()
             disableNoclip()
-        end)
-    end
 
-    if not data.ConnFocusLost then
-        data.ConnFocusLost = UserInputService.WindowFocusReleased:Connect(function()
-            disableNoclip()
-        end)
-    end
-
-    if not data.ConnNoClip then
-        data.ConnNoClip = RunService.Stepped:Connect(function()
-            if not data.ActiveState then
-                if data.IsHoldingV or next(data.OriginalCollision) then
-                    disableNoclip()
-                end
-
-                return
+            if data.ConnNoClip then
+                data.ConnNoClip:Disconnect()
+                data.ConnNoClip = nil
             end
-
-            if not UserInputService:IsKeyDown(Enum.KeyCode.V) then
-                if data.IsHoldingV then
-                    disableNoclip()
-                end
-
-                return
+            if data.ConnInputBegan then
+                data.ConnInputBegan:Disconnect()
+                data.ConnInputBegan = nil
             end
+            if data.ConnInputEnded then
+                data.ConnInputEnded:Disconnect()
+                data.ConnInputEnded = nil
+            end
+            if data.ConnFocusLost then
+                data.ConnFocusLost:Disconnect()
+                data.ConnFocusLost = nil
+            end
+        end
 
-            data.IsHoldingV = true
+        if state then
 
-            enableNoclip()
-        end)
+            startSpeedBypass()
+            startNoclip()
+        else
+
+            stopNoclip()
+            stopSpeedBypass()
+        end
     end
-
-    if not state then
-        disableNoclip()
-    end
-end
 },
 }
 -- FIM DA SEÇÃO DE BOTÕES ↑↑↑
