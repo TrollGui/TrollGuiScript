@@ -6071,7 +6071,6 @@ BypassAnticheat = {
         local CROUCH_INTERVAL = 0.1
 
         getgenv().BypassData = getgenv().BypassData or {
-
             Character = nil,
             Humanoid = nil,
             RootPart = nil,
@@ -6081,12 +6080,10 @@ BypassAnticheat = {
             HeartbeatConn = nil,
             CharAddedConn = nil,
             WalkSpeedConn = nil,
-
             oldIndex = nil,
             oldNewIndex = nil,
             oldNamecall = nil,
             mt = nil,
-
             ConnNoClip = nil,
             ConnInputBegan = nil,
             ConnInputEnded = nil,
@@ -6102,15 +6099,11 @@ BypassAnticheat = {
         local data = getgenv().BypassData
         data.ActiveState = state
 
-        local function getCharacter()
-            return LocalPlayer.Character
-        end
-
+        local function getCharacter() return LocalPlayer.Character end
         local function getHumanoid()
             local character = getCharacter()
             return character and character:FindFirstChildOfClass("Humanoid")
         end
-
         local function getRootPart()
             local character = getCharacter()
             return character and character:FindFirstChild("HumanoidRootPart")
@@ -6254,22 +6247,12 @@ BypassAnticheat = {
         end
 
         local function stopSpeedBypass()
-            if data.HeartbeatConn then
-                data.HeartbeatConn:Disconnect()
-                data.HeartbeatConn = nil
-            end
-            if data.CharAddedConn then
-                data.CharAddedConn:Disconnect()
-                data.CharAddedConn = nil
-            end
-            if data.WalkSpeedConn then
-                data.WalkSpeedConn:Disconnect()
-                data.WalkSpeedConn = nil
-            end
+            if data.HeartbeatConn then data.HeartbeatConn:Disconnect() data.HeartbeatConn = nil end
+            if data.CharAddedConn then data.CharAddedConn:Disconnect() data.CharAddedConn = nil end
+            if data.WalkSpeedConn then data.WalkSpeedConn:Disconnect() data.WalkSpeedConn = nil end
 
             if data.Humanoid then
                 pcall(function()
-                    local real = data.oldIndex and data.oldIndex(data.Humanoid, "WalkSpeed") or REAL_WALKSPEED
                     data.Humanoid.WalkSpeed = REAL_WALKSPEED
                 end)
             end
@@ -6285,9 +6268,7 @@ BypassAnticheat = {
         local function restoreCollision()
             for part, originalValue in pairs(data.OriginalCollision) do
                 if part and part.Parent then
-                    pcall(function()
-                        part.CanCollide = originalValue
-                    end)
+                    pcall(function() part.CanCollide = originalValue end)
                 end
             end
             table.clear(data.OriginalCollision)
@@ -6296,15 +6277,9 @@ BypassAnticheat = {
         local function restoreMovement()
             local humanoid = getHumanoid()
             if humanoid then
-                if data.OriginalWalkSpeed ~= nil then
-                    humanoid.WalkSpeed = data.OriginalWalkSpeed
-                end
-                if data.OriginalJumpPower ~= nil then
-                    humanoid.JumpPower = data.OriginalJumpPower
-                end
-                if data.OriginalAutoRotate ~= nil then
-                    humanoid.AutoRotate = data.OriginalAutoRotate
-                end
+                if data.OriginalWalkSpeed ~= nil then humanoid.WalkSpeed = data.OriginalWalkSpeed end
+                if data.OriginalJumpPower ~= nil then humanoid.JumpPower = data.OriginalJumpPower end
+                if data.OriginalAutoRotate ~= nil then humanoid.AutoRotate = data.OriginalAutoRotate end
                 humanoid:Move(Vector3.zero, true)
             end
             data.OriginalWalkSpeed = nil
@@ -6319,27 +6294,16 @@ BypassAnticheat = {
         end
 
         local function enableNoclip()
-            if not data.ActiveState or not data.IsHoldingV then
-                return
-            end
+            if not data.ActiveState or not data.IsHoldingV then return end
 
             local character = getCharacter()
             local humanoid = getHumanoid()
             local rootPart = getRootPart()
+            if not character or not humanoid or not rootPart then return end
 
-            if not character or not humanoid or not rootPart then
-                return
-            end
-
-            if data.OriginalWalkSpeed == nil then
-                data.OriginalWalkSpeed = humanoid.WalkSpeed
-            end
-            if data.OriginalJumpPower == nil then
-                data.OriginalJumpPower = humanoid.JumpPower
-            end
-            if data.OriginalAutoRotate == nil then
-                data.OriginalAutoRotate = humanoid.AutoRotate
-            end
+            if data.OriginalWalkSpeed == nil then data.OriginalWalkSpeed = humanoid.WalkSpeed end
+            if data.OriginalJumpPower == nil then data.OriginalJumpPower = humanoid.JumpPower end
+            if data.OriginalAutoRotate == nil then data.OriginalAutoRotate = humanoid.AutoRotate end
 
             humanoid.WalkSpeed = 0
             humanoid.JumpPower = 0
@@ -6360,9 +6324,7 @@ BypassAnticheat = {
             if humanoidState == Enum.HumanoidStateType.Freefall
                 or humanoidState == Enum.HumanoidStateType.FallingDown then
                 rootPart.AssemblyLinearVelocity = Vector3.new(
-                    rootPart.AssemblyLinearVelocity.X,
-                    0,
-                    rootPart.AssemblyLinearVelocity.Z
+                    rootPart.AssemblyLinearVelocity.X, 0, rootPart.AssemblyLinearVelocity.Z
                 )
                 rootPart.AssemblyAngularVelocity = Vector3.zero
             end
@@ -6379,20 +6341,17 @@ BypassAnticheat = {
                     data.IsHoldingV = true
                 end)
             end
-
             if not data.ConnInputEnded then
                 data.ConnInputEnded = UserInputService.InputEnded:Connect(function(input)
                     if input.KeyCode ~= Enum.KeyCode.V then return end
                     disableNoclip()
                 end)
             end
-
             if not data.ConnFocusLost then
                 data.ConnFocusLost = UserInputService.WindowFocusReleased:Connect(function()
                     disableNoclip()
                 end)
             end
-
             if not data.ConnNoClip then
                 data.ConnNoClip = RunService.Stepped:Connect(function()
                     if not data.ActiveState then
@@ -6401,14 +6360,10 @@ BypassAnticheat = {
                         end
                         return
                     end
-
                     if not UserInputService:IsKeyDown(Enum.KeyCode.V) then
-                        if data.IsHoldingV then
-                            disableNoclip()
-                        end
+                        if data.IsHoldingV then disableNoclip() end
                         return
                     end
-
                     data.IsHoldingV = true
                     enableNoclip()
                 end)
@@ -6417,38 +6372,114 @@ BypassAnticheat = {
 
         local function stopNoclip()
             disableNoclip()
-
-            if data.ConnNoClip then
-                data.ConnNoClip:Disconnect()
-                data.ConnNoClip = nil
-            end
-            if data.ConnInputBegan then
-                data.ConnInputBegan:Disconnect()
-                data.ConnInputBegan = nil
-            end
-            if data.ConnInputEnded then
-                data.ConnInputEnded:Disconnect()
-                data.ConnInputEnded = nil
-            end
-            if data.ConnFocusLost then
-                data.ConnFocusLost:Disconnect()
-                data.ConnFocusLost = nil
-            end
+            if data.ConnNoClip then data.ConnNoClip:Disconnect() data.ConnNoClip = nil end
+            if data.ConnInputBegan then data.ConnInputBegan:Disconnect() data.ConnInputBegan = nil end
+            if data.ConnInputEnded then data.ConnInputEnded:Disconnect() data.ConnInputEnded = nil end
+            if data.ConnFocusLost then data.ConnFocusLost:Disconnect() data.ConnFocusLost = nil end
         end
 
         if state then
-
             startSpeedBypass()
             startNoclip()
         else
-
             stopNoclip()
             stopSpeedBypass()
         end
     end
 },
+
+AntiDieSystem = {
+    Nome = "Anti Die System",
+    IsToggle = true,
+    Repeat = false,
+    Script = function(state)
+        local Players = game:GetService("Players")
+        local RunService = game:GetService("RunService")
+        local LocalPlayer = Players.LocalPlayer
+
+        if state then
+            if getgenv().AntiDieActive then return end
+            getgenv().AntiDieActive = true
+
+            local SPOOF_Y = -50
+            local Character, RootPart
+            local Hitboxes = {}
+            local HeartbeatConn, CharAddedConn
+
+            local function SetupCharacter(Char)
+                if HeartbeatConn then HeartbeatConn:Disconnect() HeartbeatConn = nil end
+                Hitboxes = {}
+
+                Character = Char
+                RootPart = Char:WaitForChild("HumanoidRootPart", 30)
+
+                for _, name in ipairs({"Collision", "CollisionPart"}) do
+                    local p = Char:FindFirstChild(name)
+                    if p then
+                        p.CanCollide = false
+                        p.CanTouch = false
+                        table.insert(Hitboxes, p)
+                        local crouch = p:FindFirstChild("CollisionCrouch")
+                        if crouch then
+                            crouch.CanCollide = false
+                            crouch.CanTouch = false
+                            table.insert(Hitboxes, crouch)
+                        end
+                    end
+                end
+
+                RootPart.CanCollide = true
+
+                HeartbeatConn = RunService.Heartbeat:Connect(function()
+                    if not Character or not Character.Parent then return end
+                    if not RootPart or not RootPart.Parent then return end
+                    local target = RootPart.Position + Vector3.new(0, SPOOF_Y, 0)
+                    for _, p in ipairs(Hitboxes) do
+                        if p and p.Parent then p.Position = target end
+                    end
+                end)
+            end
+
+            if LocalPlayer.Character then
+                task.spawn(SetupCharacter, LocalPlayer.Character)
+            end
+            CharAddedConn = LocalPlayer.CharacterAdded:Connect(function(c)
+                task.wait(0.5)
+                SetupCharacter(c)
+            end)
+
+            getgenv().AntiDieCleanup = function()
+                if HeartbeatConn then HeartbeatConn:Disconnect() HeartbeatConn = nil end
+                if CharAddedConn then CharAddedConn:Disconnect() CharAddedConn = nil end
+                if Character then
+                    for _, p in ipairs(Hitboxes) do
+                        if p and p.Parent then
+                            p.CanCollide = true
+                            p.CanTouch = true
+                        end
+                    end
+                end
+                Hitboxes = {}
+                Character = nil
+                RootPart = nil
+            end
+        else
+            if getgenv().AntiDieCleanup then
+                pcall(getgenv().AntiDieCleanup)
+                getgenv().AntiDieCleanup = nil
+            end
+            getgenv().AntiDieActive = false
+        end
+    end
+},
 }
 -- FIM DA SEÇÃO DE BOTÕES ↑↑↑
+
+-- Botões que só funcionam em uma place.
+local RestricaoPorPlace = {
+    [6839171747] = { "BypassAnticheat", "AntiDieSystem" },
+}
+
 
 local buttonStates = {}
 local buttonConnections = {}
@@ -7462,15 +7493,90 @@ Instance.new("UICorner", SpeedBox).CornerRadius = UDim.new(0,8)
 SpeedBox.ZIndex = 4
 SpeedBox.ClearTextOnFocus = false
 
-local SpeedSet = makeButton("Set Speed")
-SpeedSet.MouseButton1Click:Connect(function()
-    flashBlue(SpeedSet)
-    local v = tonumber(SpeedBox.Text)
-    if v then
-        speedValue = v
-        if humanoid then
-            humanoid.WalkSpeed = v
+local speedLoopActive = false
+local speedLoopThread = nil
+local savedOriginalWalkSpeed = nil
+
+local function stopSpeedLoop(restore)
+    speedLoopActive = false
+
+    if speedLoopThread then
+        pcall(task.cancel, speedLoopThread)
+        speedLoopThread = nil
+    end
+
+    if restore and player.Character then
+        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+
+            hum.WalkSpeed = savedOriginalWalkSpeed or 16
         end
+    end
+
+    savedOriginalWalkSpeed = nil
+end
+
+local function startSpeedLoop()
+    stopSpeedLoop(false)
+    speedLoopActive = true
+
+    speedLoopThread = task.spawn(function()
+        while speedLoopActive do
+            local char = player.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum and speedValue then
+                    hum.WalkSpeed = speedValue
+                end
+            end
+            task.wait(0.1)
+        end
+    end)
+end
+
+local SpeedSet, setSpeedSetState, getSpeedSetState = makeToggle("Set Speed", 36)
+
+SpeedSet.MouseButton1Click:Connect(function()
+    local willTurnOn = not getSpeedSetState()
+
+    if willTurnOn then
+
+        local v = tonumber(SpeedBox.Text)
+        if not v then
+            flashBlue(SpeedSet)
+            SpeedBox.Text = "Valor inválido!"
+            task.delay(1.4, function()
+                if SpeedBox then
+                    SpeedBox.Text = tostring(speedValue or 16)
+                end
+            end)
+            return
+        end
+
+        if player.Character then
+            local hum = player.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                savedOriginalWalkSpeed = hum.WalkSpeed
+                hum.WalkSpeed = v
+            end
+        end
+
+        speedValue = v
+        setSpeedSetState(true)
+        startSpeedLoop()
+
+    else
+        setSpeedSetState(false)
+        stopSpeedLoop(true)
+    end
+end)
+
+player.CharacterAdded:Connect(function(char)
+    if not speedLoopActive then return end
+    task.wait(0.5)
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum and speedValue then
+        hum.WalkSpeed = speedValue
     end
 end)
 
@@ -7925,6 +8031,24 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         end
     end
 end)
+
+do
+
+    local BotaoParaPlace = {}
+    for placeId, listaBotoes in pairs(RestricaoPorPlace) do
+        for _, chaveBotao in ipairs(listaBotoes) do
+            BotaoParaPlace[chaveBotao] = placeId
+        end
+    end
+
+    for chaveBotao, _ in pairs(BotaoParaPlace) do
+        local placePermitida = BotaoParaPlace[chaveBotao]
+
+        if Buttons[chaveBotao] and game.PlaceId ~= placePermitida then
+            Buttons[chaveBotao] = nil
+                    end
+    end
+end
 
 for buttonName, buttonData in pairs(Buttons) do
     createCustomButton(buttonName, buttonData, Content)
