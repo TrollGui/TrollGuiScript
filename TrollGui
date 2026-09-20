@@ -6058,18 +6058,25 @@ BypassAnticheat = {
     IsToggle = true,
     Repeat = false,
     Script = function(state)
-        local Players = game:GetService("Players")
-        local RunService = game:GetService("RunService")
+        local Players           = game:GetService("Players")
+        local RunService        = game:GetService("RunService")
         local ReplicatedStorage = game:GetService("ReplicatedStorage")
-        local UserInputService = game:GetService("UserInputService")
+        local UserInputService  = game:GetService("UserInputService")
 
         local LocalPlayer = Players.LocalPlayer
         if not LocalPlayer then return end
 
-        local REAL_WALKSPEED  = 16
-        local BOOST_WALKSPEED = 16
-        local CROUCH_INTERVAL = 0.1
+        ---------------------------------------------------------------
+        -- CONFIGURAÇÕES (mesmos valores do Abysall Hub)
+        ---------------------------------------------------------------
+        local REAL_WALKSPEED   = 16
+        local BOOST_WALKSPEED  = 16
+        local CROUCH_INTERVAL  = 0.1
+        local MANIPULATE_SPEED = 2.25   -- velocidade do BodyVelocity (Abysall)
 
+        ---------------------------------------------------------------
+        -- ESTADO GLOBAL
+        ---------------------------------------------------------------
         getgenv().BypassData = getgenv().BypassData or {
             Character = nil,
             Humanoid = nil,
@@ -6094,11 +6101,15 @@ BypassAnticheat = {
             OriginalWalkSpeed = nil,
             OriginalJumpPower = nil,
             OriginalAutoRotate = nil,
+            ManipulateBody = nil,
         }
 
         local data = getgenv().BypassData
         data.ActiveState = state
 
+        ---------------------------------------------------------------
+        -- HELPERS BÁSICOS
+        ---------------------------------------------------------------
         local function getCharacter() return LocalPlayer.Character end
         local function getHumanoid()
             local character = getCharacter()
@@ -6110,7 +6121,7 @@ BypassAnticheat = {
         end
 
         local function findCrouchRemote()
-            for _, name in ipairs({"RemotesFolder", "EntityInfo", "Bricks", "Remotes"}) do
+            for _, name in ipairs({ "RemotesFolder", "EntityInfo", "Bricks", "Remotes" }) do
                 local f = ReplicatedStorage:FindFirstChild(name)
                 if f then
                     local c = f:FindFirstChild("Crouch")
@@ -6122,6 +6133,9 @@ BypassAnticheat = {
 
         local CrouchRemote = findCrouchRemote()
 
+        ---------------------------------------------------------------
+        -- SPEED HOOKS
+        ---------------------------------------------------------------
         local function installSpeedHooks()
             if not hookmetamethod or not getrawmetatable then return end
             if data.oldIndex then return end
@@ -6136,7 +6150,7 @@ BypassAnticheat = {
             mt.__namecall = newcclosure(function(self, ...)
                 local method = getnamecallmethod()
                 if self == CrouchRemote and method == "FireServer" then
-                    local args = {...}
+                    local args = { ... }
                     args[1] = true
                     args[2] = true
                     return data.oldNamecall(self, table.unpack(args))
@@ -6167,17 +6181,20 @@ BypassAnticheat = {
             if not data.mt then return end
             pcall(function()
                 setreadonly(data.mt, false)
-                if data.oldIndex then data.mt.__index = data.oldIndex end
+                if data.oldIndex    then data.mt.__index    = data.oldIndex    end
                 if data.oldNewIndex then data.mt.__newindex = data.oldNewIndex end
                 if data.oldNamecall then data.mt.__namecall = data.oldNamecall end
                 setreadonly(data.mt, true)
             end)
-            data.oldIndex = nil
+            data.oldIndex    = nil
             data.oldNewIndex = nil
             data.oldNamecall = nil
-            data.mt = nil
+            data.mt          = nil
         end
 
+        ---------------------------------------------------------------
+        -- SETUP DO PERSONAGEM
+        ---------------------------------------------------------------
         local function setupCharacter(char)
             data.Character = char
             data.Humanoid  = char:WaitForChild("Humanoid", 10)
@@ -6207,6 +6224,9 @@ BypassAnticheat = {
             end
         end
 
+        ---------------------------------------------------------------
+        -- SPEED BYPASS
+        ---------------------------------------------------------------
         local function startSpeedBypass()
             installSpeedHooks()
 
@@ -6247,24 +6267,25 @@ BypassAnticheat = {
         end
 
         local function stopSpeedBypass()
-            if data.HeartbeatConn then data.HeartbeatConn:Disconnect() data.HeartbeatConn = nil end
-            if data.CharAddedConn then data.CharAddedConn:Disconnect() data.CharAddedConn = nil end
-            if data.WalkSpeedConn then data.WalkSpeedConn:Disconnect() data.WalkSpeedConn = nil end
+            if data.HeartbeatConn  then data.HeartbeatConn:Disconnect()  data.HeartbeatConn  = nil end
+            if data.CharAddedConn  then data.CharAddedConn:Disconnect()  data.CharAddedConn  = nil end
+            if data.WalkSpeedConn  then data.WalkSpeedConn:Disconnect()  data.WalkSpeedConn  = nil end
 
             if data.Humanoid then
-                pcall(function()
-                    data.Humanoid.WalkSpeed = REAL_WALKSPEED
-                end)
+                pcall(function() data.Humanoid.WalkSpeed = REAL_WALKSPEED end)
             end
 
             uninstallSpeedHooks()
 
             data.Character = nil
-            data.Humanoid = nil
-            data.RootPart = nil
+            data.Humanoid  = nil
+            data.RootPart  = nil
             data.Collision = nil
         end
 
+        ---------------------------------------------------------------
+        -- RESTAURAÇÃO
+        ---------------------------------------------------------------
         local function restoreCollision()
             for part, originalValue in pairs(data.OriginalCollision) do
                 if part and part.Parent then
@@ -6277,18 +6298,40 @@ BypassAnticheat = {
         local function restoreMovement()
             local humanoid = getHumanoid()
             if humanoid then
-                if data.OriginalWalkSpeed ~= nil then humanoid.WalkSpeed = data.OriginalWalkSpeed end
-                if data.OriginalJumpPower ~= nil then humanoid.JumpPower = data.OriginalJumpPower end
+                if data.OriginalWalkSpeed  ~= nil then humanoid.WalkSpeed  = data.OriginalWalkSpeed  end
+                if data.OriginalJumpPower  ~= nil then humanoid.JumpPower  = data.OriginalJumpPower  end
                 if data.OriginalAutoRotate ~= nil then humanoid.AutoRotate = data.OriginalAutoRotate end
                 humanoid:Move(Vector3.zero, true)
             end
-            data.OriginalWalkSpeed = nil
-            data.OriginalJumpPower = nil
+            data.OriginalWalkSpeed  = nil
+            data.OriginalJumpPower  = nil
             data.OriginalAutoRotate = nil
         end
 
+        ---------------------------------------------------------------
+        -- BODY VELOCITY (método Abysall)
+        ---------------------------------------------------------------
+        local function ensureManipulateBody()
+            if not data.ManipulateBody then
+                local bv = Instance.new("BodyVelocity")
+                bv.Name     = "Abysall_ManipulateBody"
+                bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+                bv.P        = 1250
+                data.ManipulateBody = bv
+            end
+            return data.ManipulateBody
+        end
+
+        ---------------------------------------------------------------
+        -- NOCLIP + MOVE FORWARD COM V
+        ---------------------------------------------------------------
         local function disableNoclip()
             data.IsHoldingV = false
+
+            if data.ManipulateBody and data.ManipulateBody.Parent then
+                data.ManipulateBody.Parent = nil
+            end
+
             restoreCollision()
             restoreMovement()
         end
@@ -6297,16 +6340,16 @@ BypassAnticheat = {
             if not data.ActiveState or not data.IsHoldingV then return end
 
             local character = getCharacter()
-            local humanoid = getHumanoid()
-            local rootPart = getRootPart()
+            local humanoid  = getHumanoid()
+            local rootPart  = getRootPart()
             if not character or not humanoid or not rootPart then return end
 
-            if data.OriginalWalkSpeed == nil then data.OriginalWalkSpeed = humanoid.WalkSpeed end
-            if data.OriginalJumpPower == nil then data.OriginalJumpPower = humanoid.JumpPower end
+            if data.OriginalWalkSpeed  == nil then data.OriginalWalkSpeed  = humanoid.WalkSpeed  end
+            if data.OriginalJumpPower  == nil then data.OriginalJumpPower  = humanoid.JumpPower  end
             if data.OriginalAutoRotate == nil then data.OriginalAutoRotate = humanoid.AutoRotate end
 
-            humanoid.WalkSpeed = 0
-            humanoid.JumpPower = 0
+            humanoid.WalkSpeed  = 0
+            humanoid.JumpPower  = 0
             humanoid.AutoRotate = false
             humanoid:Move(Vector3.zero, true)
 
@@ -6316,7 +6359,7 @@ BypassAnticheat = {
                         data.OriginalCollision[part] = part.CanCollide
                     end
                     part.CanCollide = false
-                    part.Anchored = false
+                    part.Anchored   = false
                 end
             end
 
@@ -6329,9 +6372,23 @@ BypassAnticheat = {
                 rootPart.AssemblyAngularVelocity = Vector3.zero
             end
 
-            rootPart.CFrame = rootPart.CFrame + (rootPart.CFrame.LookVector * 0.01)
+            local bodyVel = ensureManipulateBody()
+            bodyVel.Parent = rootPart
+
+            local look = rootPart.CFrame.LookVector
+            look = Vector3.new(look.X, 0, look.Z)
+            if look.Magnitude > 0 then
+                look = look.Unit
+            else
+                look = Vector3.zero
+            end
+
+            bodyVel.Velocity = look * MANIPULATE_SPEED
         end
 
+        ---------------------------------------------------------------
+        -- INPUT HANDLERS
+        ---------------------------------------------------------------
         local function startNoclip()
             if not data.ConnInputBegan then
                 data.ConnInputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -6372,105 +6429,576 @@ BypassAnticheat = {
 
         local function stopNoclip()
             disableNoclip()
-            if data.ConnNoClip then data.ConnNoClip:Disconnect() data.ConnNoClip = nil end
+
+            if data.ConnNoClip     then data.ConnNoClip:Disconnect()     data.ConnNoClip     = nil end
             if data.ConnInputBegan then data.ConnInputBegan:Disconnect() data.ConnInputBegan = nil end
             if data.ConnInputEnded then data.ConnInputEnded:Disconnect() data.ConnInputEnded = nil end
-            if data.ConnFocusLost then data.ConnFocusLost:Disconnect() data.ConnFocusLost = nil end
+            if data.ConnFocusLost  then data.ConnFocusLost:Disconnect()  data.ConnFocusLost  = nil end
+
+            if data.ManipulateBody then
+                pcall(function() data.ManipulateBody:Destroy() end)
+                data.ManipulateBody = nil
+            end
         end
 
+        ---------------------------------------------------------------
+        -- TOGGLE ON/OFF
+        ---------------------------------------------------------------
+        local player    = game.Players.LocalPlayer
+        local character = player.Character or player.CharacterAdded:Wait()
+
         if state then
+            local Value    = true
+            local OldJump  = false
+            local OldSlide = false
+
+            character:SetAttribute("CanJump",  Value and true or OldJump)
+            character:SetAttribute("CanSlide", Value and true or OldSlide)
+
             startSpeedBypass()
             startNoclip()
         else
+            local Value = false
+
+            character:SetAttribute("CanJump",  Value)
+            character:SetAttribute("CanSlide", Value)
+
+            -- 1) Para noclip e restaura colisão/movimento
             stopNoclip()
+
+            -- 2) Remove os hooks de metamethod ANTES de mandar o Crouch false,
+            --    senão o hook reescreveria para (true, true)
             stopSpeedBypass()
+
+            -- 3) Reseta o estado de crouch
+            data.accum          = 0
+            data.LastCrouchFire = 0
+
+            -- 4) Agora sim: dispara o Crouch como false para o servidor
+            if CrouchRemote then
+                pcall(function()
+                    CrouchRemote:FireServer(false)
+                end)
+            end
         end
     end
 },
-
 AntiDieSystem = {
     Nome = "Anti Die System",
     IsToggle = true,
     Repeat = false,
     Script = function(state)
-        local Players = game:GetService("Players")
-        local RunService = game:GetService("RunService")
+
+        local Players           = game:GetService("Players")
+        local Workspace         = game:GetService("Workspace")
+        local RunService        = game:GetService("RunService")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
         local LocalPlayer = Players.LocalPlayer
+        local MainUI = LocalPlayer.PlayerGui:FindFirstChild("MainUI")
 
-        if state then
-            if getgenv().AntiDieActive then return end
-            getgenv().AntiDieActive = true
+        local RemotesFolder = ReplicatedStorage:FindFirstChild("RemotesFolder")
+            or ReplicatedStorage:FindFirstChild("EntityInfo")
+            or ReplicatedStorage:FindFirstChild("Bricks")
 
-            local SPOOF_Y = -50
-            local Character, RootPart
-            local Hitboxes = {}
-            local HeartbeatConn, CharAddedConn
+        local GameData   = ReplicatedStorage:FindFirstChild("GameData")
+        local Floor      = (GameData and GameData:FindFirstChild("Floor") and GameData.Floor.Value) or "Hotel"
+        local LatestRoom = GameData and GameData:FindFirstChild("LatestRoom")
 
-            local function SetupCharacter(Char)
-                if HeartbeatConn then HeartbeatConn:Disconnect() HeartbeatConn = nil end
-                Hitboxes = {}
+        if Floor == "Hotel" and RemotesFolder and RemotesFolder.Name == "Bricks" then
+            Floor = "OldHotel"
+        end
 
-                Character = Char
-                RootPart = Char:WaitForChild("HumanoidRootPart", 30)
+        getgenv().AntiDieData = getgenv().AntiDieData or {
+            Connections = {},
+            FakeEvents  = {},
+            Modules     = {},
+            SavedProps  = {},
+            Character   = nil,
+            Humanoid    = nil,
+            RootPart    = nil,
+            Collision   = nil,
+            CollisionPart = nil,
+            CollisionClone = nil,
+            CollisionPartClone = nil,
+            OriginalC1 = nil,
+            OriginalHipHeight = nil,
+            CharacterConn = nil,
+        }
+        local Data = getgenv().AntiDieData
 
-                for _, name in ipairs({"Collision", "CollisionPart"}) do
-                    local p = Char:FindFirstChild(name)
-                    if p then
-                        p.CanCollide = false
-                        p.CanTouch = false
-                        table.insert(Hitboxes, p)
-                        local crouch = p:FindFirstChild("CollisionCrouch")
-                        if crouch then
-                            crouch.CanCollide = false
-                            crouch.CanTouch = false
-                            table.insert(Hitboxes, crouch)
-                        end
+        local function SaveThenSet(obj, prop, value)
+            if not obj or not obj.Parent then return end
+            pcall(function()
+                table.insert(Data.SavedProps, {obj, prop, obj[prop]})
+                obj[prop] = value
+            end)
+        end
+
+        local function AddConn(conn)
+            if conn then table.insert(Data.Connections, conn) end
+        end
+
+        local function DisconnectAll()
+            for _, conn in ipairs(Data.Connections) do
+                pcall(function() conn:Disconnect() end)
+            end
+            Data.Connections = {}
+        end
+
+        local function GetAll(name)
+            local out = {}
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj.Name == name then table.insert(out, obj) end
+            end
+            return out
+        end
+
+        if not state then
+            DisconnectAll()
+
+            for _, entry in ipairs(Data.Modules) do
+                local mod, originalName = entry[1], entry[2]
+                if mod and mod.Parent then
+                    pcall(function() mod.Name = originalName end)
+                end
+            end
+            Data.Modules = {}
+
+            if MainUI and MainUI:FindFirstChild("MainFrame") then
+                local surge = MainUI.MainFrame:FindFirstChild("SurgeVignette_Disabled")
+                if surge then pcall(function() surge.Name = "SurgeVignette" end) end
+            end
+
+            local fe = Data.FakeEvents
+            if RemotesFolder and fe then
+                local pairs_ = {
+                    {fe.Screech, fe.Screech_Real},
+                    {fe.Shade,   fe.Shade_Real},
+                    {fe.A90,     fe.A90_Real},
+                    {fe.Surge,   fe.Surge_Real},
+                }
+                for _, p in ipairs(pairs_) do
+                    local fake, real = p[1], p[2]
+                    if fake then pcall(function() fake:Destroy() end) end
+                    if real then pcall(function() real.Parent = RemotesFolder end) end
+                end
+            end
+            Data.FakeEvents = {}
+
+            for _, entry in ipairs(Data.SavedProps) do
+                local obj, prop, val = entry[1], entry[2], entry[3]
+                if obj and obj.Parent then
+                    pcall(function() obj[prop] = val end)
+                end
+            end
+            Data.SavedProps = {}
+
+            if Data.CharacterConn then
+                pcall(function() Data.CharacterConn:Disconnect() end)
+                Data.CharacterConn = nil
+            end
+
+            local char = Data.Character or LocalPlayer.Character
+            if char then
+                local hum = Data.Humanoid or char:FindFirstChildOfClass("Humanoid")
+                local root = Data.RootPart or char:FindFirstChild("HumanoidRootPart")
+                local lowerTorso = char:FindFirstChild("LowerTorso")
+                if lowerTorso and lowerTorso:FindFirstChild("Root") and Data.OriginalC1 then
+                    pcall(function() lowerTorso.Root.C1 = Data.OriginalC1 end)
+                end
+                if hum then
+                    hum.HipHeight = Data.OriginalHipHeight or 2.396
+                end
+                if root then
+                    root.CanCollide = true
+                end
+                for _, part in ipairs(char:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        pcall(function() part.CanCollide = true end)
                     end
                 end
 
-                RootPart.CanCollide = true
+                if RemotesFolder and RemotesFolder:FindFirstChild("Crouch") then
+                    pcall(function() RemotesFolder.Crouch:FireServer(false, true) end)
+                end
+            end
 
-                HeartbeatConn = RunService.Heartbeat:Connect(function()
-                    if not Character or not Character.Parent then return end
-                    if not RootPart or not RootPart.Parent then return end
-                    local target = RootPart.Position + Vector3.new(0, SPOOF_Y, 0)
-                    for _, p in ipairs(Hitboxes) do
-                        if p and p.Parent then p.Position = target end
+            if Data.CollisionClone     then pcall(function() Data.CollisionClone:Destroy() end)     end
+            if Data.CollisionPartClone then pcall(function() Data.CollisionPartClone:Destroy() end) end
+
+            Data.Character = nil
+            Data.Humanoid = nil
+            Data.RootPart = nil
+            Data.Collision = nil
+            Data.CollisionPart = nil
+            Data.CollisionClone = nil
+            Data.CollisionPartClone = nil
+            Data.OriginalC1 = nil
+            Data.OriginalHipHeight = nil
+
+                        return
+        end
+
+        DisconnectAll()
+
+        local function SetupCharacter(NewChar)
+            if not getgenv().AntiDieData then return end
+            if not NewChar or not NewChar.Parent then return end
+
+            local hum   = NewChar:WaitForChild("Humanoid", 30)
+            local root  = NewChar:WaitForChild("HumanoidRootPart", 30)
+            local col   = NewChar:WaitForChild("Collision", 30)
+            if not hum or not root or not col then return end
+
+            local colPart = NewChar:FindFirstChild("CollisionPart") or col
+
+            for _, name in {"CollisionClone", "CollisionPartClone"} do
+                local old = NewChar:FindFirstChild(name)
+                if old then old:Destroy() end
+            end
+
+            local colClone = col:Clone()
+            colClone.Name     = "CollisionClone"
+            colClone.Massless = true
+            colClone.Parent   = NewChar
+
+            local colPartClone = colPart:Clone()
+            colPartClone.Name       = "CollisionPartClone"
+            colPartClone.CanCollide = false
+            colPartClone.Massless   = true
+            colPartClone.Parent     = NewChar
+
+            if colPartClone:FindFirstChild("CollisionCrouch") then
+                colPartClone.CollisionCrouch:Destroy()
+            end
+
+            local originalC1 = nil
+            if NewChar:FindFirstChild("LowerTorso") and NewChar.LowerTorso:FindFirstChild("Root") then
+                originalC1 = NewChar.LowerTorso.Root.C1
+            end
+
+            Data.Character = NewChar
+            Data.Humanoid  = hum
+            Data.RootPart  = root
+            Data.Collision = col
+            Data.CollisionPart = colPart
+            Data.CollisionClone = colClone
+            Data.CollisionPartClone = colPartClone
+            Data.OriginalC1 = originalC1
+            Data.OriginalHipHeight = hum.HipHeight
+
+            if Floor ~= "Fools" and Floor ~= "OldHotel" then
+                task.wait(1)
+                if not getgenv().AntiDieData or Data.Character ~= NewChar then return end
+                root.CFrame = root.CFrame * CFrame.new(0, -2.346, 0)
+                hum.HipHeight = 0.05
+
+                if RemotesFolder and RemotesFolder:FindFirstChild("Crouch") then
+                    pcall(function() RemotesFolder.Crouch:FireServer(true, true) end)
+                end
+            end
+        end
+
+        if LocalPlayer.Character then
+            task.spawn(SetupCharacter, LocalPlayer.Character)
+        end
+        Data.CharacterConn = LocalPlayer.CharacterAdded:Connect(function(c)
+            task.spawn(SetupCharacter, c)
+        end)
+        AddConn(Data.CharacterConn)
+
+        AddConn(RunService.Heartbeat:Connect(function()
+            if not getgenv().AntiDieData then return end
+
+            local char = Data.Character
+            local hum  = Data.Humanoid
+            local root = Data.RootPart
+            local col  = Data.Collision
+            local colPart  = Data.CollisionPart
+            local colClone = Data.CollisionClone
+            local colPartClone = Data.CollisionPartClone
+
+            if not char or not char.Parent then return end
+            if not hum or not hum.Parent then return end
+            if not root or not root.Parent then return end
+            if not col or not col.Parent then return end
+            if not colClone or not colClone.Parent then return end
+
+            if Data.OriginalC1 and char:FindFirstChild("LowerTorso")
+                and char.LowerTorso:FindFirstChild("Root")
+            then
+                char.LowerTorso.Root.C1 = Data.OriginalC1 * CFrame.new(0, -2.346, 0)
+            end
+
+            col.Position = root.Position + Vector3.new(0, 2.328, 0)
+            if colPart and colPart.Parent and colPart ~= col then
+                colPart.Position = root.Position + Vector3.new(0, 2.328, 0)
+            end
+
+            if col:FindFirstChild("CollisionCrouch") and colClone:FindFirstChild("CollisionCrouch") then
+                col.CollisionCrouch.Position = root.Position + Vector3.new(0, 1.328, 0)
+                colClone.CollisionCrouch.CollisionGroup = col.CollisionCrouch.CollisionGroup
+            end
+            if colClone:FindFirstChild("CollisionCrouch") then
+                colClone.CollisionCrouch.Position = root.Position + Vector3.new(0, 0.75, 0)
+            end
+
+            colClone.CollisionGroup = col.CollisionGroup
+            colClone.Position       = root.Position + Vector3.new(0, 1.75, 0)
+
+            if hum.HipHeight ~= 0.05 then
+                hum.HipHeight = 0.05
+            end
+
+            root.CanCollide = false
+            for _, part in ipairs(char:GetChildren()) do
+                if part:IsA("BasePart")
+                    and part ~= col
+                    and part ~= colPart
+                    and part ~= colClone
+                    and part ~= colPartClone
+                then
+                    part.CanCollide = false
+                end
+            end
+            colClone.CanCollide = true
+            if colPartClone then colPartClone.CanCollide = false end
+
+        end))
+
+        local UIModules
+        if MainUI then
+            local init = MainUI:FindFirstChild("Initiator")
+            local mg   = init and init:FindFirstChild("Main_Game")
+            local rl   = mg and mg:FindFirstChild("RemoteListener")
+            UIModules  = rl and rl:FindFirstChild("Modules")
+        end
+
+        local ClientModules = ReplicatedStorage:FindFirstChild("ModulesClient")
+            or ReplicatedStorage:FindFirstChild("ClientModules")
+        local EntityModules = ClientModules and ClientModules:FindFirstChild("EntityModules")
+
+        local ModScreech = UIModules and UIModules:FindFirstChild("Screech")
+        local ModA90     = UIModules and UIModules:FindFirstChild("A90")
+        local ModDread   = UIModules and UIModules:FindFirstChild("Dread")
+        local ModGlitch  = EntityModules and EntityModules:FindFirstChild("Glitch")
+        local ModShade   = EntityModules and EntityModules:FindFirstChild("Shade")
+        local ModVoid    = EntityModules and EntityModules:FindFirstChild("Void")
+        local ModSpider  = UIModules and UIModules:FindFirstChild("SpiderJumpscare")
+
+        local function Register(mod, name)
+            if mod then table.insert(Data.Modules, {mod, name or mod.Name}) end
+        end
+        Register(ModScreech, "Screech")
+        Register(ModA90,     "A90")
+        Register(ModDread,   "Dread")
+        Register(ModGlitch,  "Glitch")
+        Register(ModShade,   "Shade")
+        Register(ModVoid,    "Void")
+        Register(ModSpider,  "SpiderJumpscare")
+
+        if ModScreech then ModScreech.Name = "Screech_Disabled" end
+        if ModA90     then ModA90.Name     = "A90_Disabled"     end
+        if ModDread   then ModDread.Name   = "Dread_Disabled"   end
+        if ModShade   then ModShade.Name   = "Shade_Disabled"   end
+        if ModGlitch  then ModGlitch.Name  = "Glitch_Disabled"  end
+        if ModVoid    then ModVoid.Name    = "Void_Disabled"    end
+        if ModSpider  then ModSpider.Name  = "SpiderJumpscare_Disabled" end
+
+        if MainUI and MainUI:FindFirstChild("MainFrame") then
+            local surge = MainUI.MainFrame:FindFirstChild("SurgeVignette")
+            if surge then surge.Name = "SurgeVignette_Disabled" end
+        end
+
+        if RemotesFolder then
+            local function SetupFake(name)
+                local real = RemotesFolder:FindFirstChild(name)
+                if not real then return nil, nil end
+                local fake = Instance.new("RemoteEvent")
+                fake.Name   = name
+                fake.Parent = RemotesFolder
+                real.Parent = nil
+                return fake, real
+            end
+
+            local fScreech, rScreech = SetupFake("Screech")
+            local fShade,   rShade   = SetupFake("ShadeResult")
+            local fA90,     rA90     = SetupFake("A90")
+            local fSurge,   rSurge   = SetupFake("SurgeRemote")
+
+            Data.FakeEvents = {
+                Screech = fScreech, Screech_Real = rScreech,
+                Shade   = fShade,   Shade_Real   = rShade,
+                A90     = fA90,     A90_Real     = rA90,
+                Surge   = fSurge,   Surge_Real   = rSurge,
+            }
+        end
+
+        for _, obj in ipairs(GetAll("GiggleCeiling")) do
+            local hb = obj:FindFirstChild("Hitbox")
+            if hb then SaveThenSet(hb, "CanTouch", false) end
+        end
+
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj.Name == "DoorFake" or obj.Name == "FakeDoor" then
+                local hidden = obj:FindFirstChild("Hidden")
+                if hidden then SaveThenSet(hidden, "CanTouch", false) end
+                local lock = obj:FindFirstChild("Lock")
+                if lock and lock:FindFirstChild("UnlockPrompt") then
+                    SaveThenSet(lock.UnlockPrompt, "Enabled", false)
+                end
+            end
+        end
+
+        for _, obj in ipairs(GetAll("GloomPile")) do
+            for _, part in ipairs(obj:GetDescendants()) do
+                if part:IsA("BasePart") then SaveThenSet(part, "CanTouch", false) end
+            end
+        end
+
+        for _, name in ipairs({"Seek_Arm", "ChandelierObstruction"}) do
+            for _, obj in ipairs(GetAll(name)) do
+                for _, part in ipairs(obj:GetDescendants()) do
+                    if part:IsA("BasePart") then SaveThenSet(part, "CanTouch", false) end
+                end
+            end
+        end
+        for _, obj in ipairs(GetAll("SeekFloodline")) do
+            SaveThenSet(obj, "CanCollide", true)
+        end
+
+        for _, obj in ipairs(GetAll("SideroomSpace")) do
+            local col = obj:FindFirstChild("Collision")
+            if col then
+                SaveThenSet(col, "CanCollide", true)
+                SaveThenSet(col, "CanTouch", false)
+            end
+        end
+
+        for _, obj in ipairs(GetAll("Lava")) do
+            SaveThenSet(obj, "CanTouch", false)
+        end
+
+        for _, obj in ipairs(GetAll("ScaryWall")) do
+            for _, part in ipairs(obj:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    SaveThenSet(part, "CanTouch", false)
+                    SaveThenSet(part, "CanCollide", false)
+                end
+            end
+        end
+
+        for _, obj in ipairs(GetAll("Snare")) do
+            for _, part in ipairs(obj:GetDescendants()) do
+                if part:IsA("BasePart") then SaveThenSet(part, "CanTouch", false) end
+            end
+        end
+
+        for _, obj in ipairs(GetAll("BananaPeel")) do
+            SaveThenSet(obj, "CanTouch", false)
+        end
+
+        for _, obj in ipairs(GetAll("JeffTheKiller")) do
+            for _, part in ipairs(obj:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    SaveThenSet(part, "CanCollide", false)
+                    SaveThenSet(part, "CanTouch", false)
+                end
+            end
+            local hum = obj:FindFirstChild("Humanoid")
+            if hum then hum.Health = 0 end
+        end
+
+        AddConn(Workspace.DescendantAdded:Connect(function(obj)
+            if not getgenv().AntiDieData then return end
+
+            if obj.Name == "GiggleCeiling" then
+                task.spawn(function()
+                    local hb = obj:WaitForChild("Hitbox", 5)
+                    if hb then SaveThenSet(hb, "CanTouch", false) end
+                end)
+            elseif obj.Name == "GloomPile" then
+                for _, part in ipairs(obj:GetDescendants()) do
+                    if part:IsA("BasePart") then SaveThenSet(part, "CanTouch", false) end
+                end
+                AddConn(obj.DescendantAdded:Connect(function(part)
+                    if part:IsA("BasePart") then SaveThenSet(part, "CanTouch", false) end
+                end))
+            elseif obj.Name == "Snare" then
+                for _, part in ipairs(obj:GetDescendants()) do
+                    if part:IsA("BasePart") then SaveThenSet(part, "CanTouch", false) end
+                end
+                AddConn(obj.DescendantAdded:Connect(function(part)
+                    if part:IsA("BasePart") then SaveThenSet(part, "CanTouch", false) end
+                end))
+            elseif obj.Name == "Lava" then
+                SaveThenSet(obj, "CanTouch", false)
+            elseif obj.Name == "ScaryWall" then
+                for _, part in ipairs(obj:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        SaveThenSet(part, "CanTouch", false)
+                        SaveThenSet(part, "CanCollide", false)
+                    end
+                end
+            elseif obj.Name == "BananaPeel" then
+                SaveThenSet(obj, "CanTouch", false)
+            elseif obj.Name == "JeffTheKiller" then
+                for _, part in ipairs(obj:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        SaveThenSet(part, "CanCollide", false)
+                        SaveThenSet(part, "CanTouch", false)
+                    end
+                end
+                task.spawn(function()
+                    local hum = obj:WaitForChild("Humanoid", 5)
+                    if hum then hum.Health = 0 end
+                end)
+            elseif obj.Name == "SideroomSpace" then
+                task.spawn(function()
+                    local col = obj:WaitForChild("Collision", 5)
+                    if col then
+                        SaveThenSet(col, "CanCollide", true)
+                        SaveThenSet(col, "CanTouch", false)
                     end
                 end)
-            end
-
-            if LocalPlayer.Character then
-                task.spawn(SetupCharacter, LocalPlayer.Character)
-            end
-            CharAddedConn = LocalPlayer.CharacterAdded:Connect(function(c)
-                task.wait(0.5)
-                SetupCharacter(c)
-            end)
-
-            getgenv().AntiDieCleanup = function()
-                if HeartbeatConn then HeartbeatConn:Disconnect() HeartbeatConn = nil end
-                if CharAddedConn then CharAddedConn:Disconnect() CharAddedConn = nil end
-                if Character then
-                    for _, p in ipairs(Hitboxes) do
-                        if p and p.Parent then
-                            p.CanCollide = true
-                            p.CanTouch = true
-                        end
+            elseif obj.Name == "DoorFake" or obj.Name == "FakeDoor" then
+                task.spawn(function()
+                    local hidden = obj:WaitForChild("Hidden", 5)
+                    if hidden then SaveThenSet(hidden, "CanTouch", false) end
+                    local lock = obj:FindFirstChild("Lock")
+                    if lock and lock:FindFirstChild("UnlockPrompt") then
+                        SaveThenSet(lock.UnlockPrompt, "Enabled", false)
                     end
+                end)
+            elseif obj.Name == "Seek_Arm" or obj.Name == "ChandelierObstruction" then
+                for _, part in ipairs(obj:GetDescendants()) do
+                    if part:IsA("BasePart") then SaveThenSet(part, "CanTouch", false) end
                 end
-                Hitboxes = {}
-                Character = nil
-                RootPart = nil
+            elseif obj.Name == "SeekFloodline" then
+                SaveThenSet(obj, "CanCollide", true)
             end
-        else
-            if getgenv().AntiDieCleanup then
-                pcall(getgenv().AntiDieCleanup)
-                getgenv().AntiDieCleanup = nil
+        end))
+
+        AddConn(RunService.Heartbeat:Connect(function()
+            if not getgenv().AntiDieData then return end
+            if not RemotesFolder then return end
+            local mr = RemotesFolder:FindFirstChild("MotorReplication")
+            if not mr then return end
+
+            local isEyes    = Workspace:FindFirstChild("Eyes") or Workspace:FindFirstChild("Lookman")
+            local isLookman = Workspace:FindFirstChild("BackdoorLookman")
+
+            if isEyes or isLookman then
+                if Floor == "Fools" or Floor == "OldHotel" then
+                    pcall(function() mr:FireServer(0, -65, 0, false) end)
+                else
+                    pcall(function() mr:FireServer(-650) end)
+                end
             end
-            getgenv().AntiDieActive = false
-        end
-    end
+        end))
+
+            end,
 },
 }
 -- FIM DA SEÇÃO DE BOTÕES ↑↑↑
