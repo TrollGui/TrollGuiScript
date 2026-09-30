@@ -6066,17 +6066,11 @@ BypassAnticheat = {
         local LocalPlayer = Players.LocalPlayer
         if not LocalPlayer then return end
 
-        ---------------------------------------------------------------
-        -- CONFIGURAÇÕES (mesmos valores do Abysall Hub)
-        ---------------------------------------------------------------
         local REAL_WALKSPEED   = 16
         local BOOST_WALKSPEED  = 16
         local CROUCH_INTERVAL  = 0.1
-        local MANIPULATE_SPEED = 2.25   -- velocidade do BodyVelocity (Abysall)
+        local MANIPULATE_SPEED = 2.25
 
-        ---------------------------------------------------------------
-        -- ESTADO GLOBAL
-        ---------------------------------------------------------------
         getgenv().BypassData = getgenv().BypassData or {
             Character = nil,
             Humanoid = nil,
@@ -6107,9 +6101,6 @@ BypassAnticheat = {
         local data = getgenv().BypassData
         data.ActiveState = state
 
-        ---------------------------------------------------------------
-        -- HELPERS BÁSICOS
-        ---------------------------------------------------------------
         local function getCharacter() return LocalPlayer.Character end
         local function getHumanoid()
             local character = getCharacter()
@@ -6133,9 +6124,6 @@ BypassAnticheat = {
 
         local CrouchRemote = findCrouchRemote()
 
-        ---------------------------------------------------------------
-        -- SPEED HOOKS
-        ---------------------------------------------------------------
         local function installSpeedHooks()
             if not hookmetamethod or not getrawmetatable then return end
             if data.oldIndex then return end
@@ -6192,9 +6180,6 @@ BypassAnticheat = {
             data.mt          = nil
         end
 
-        ---------------------------------------------------------------
-        -- SETUP DO PERSONAGEM
-        ---------------------------------------------------------------
         local function setupCharacter(char)
             data.Character = char
             data.Humanoid  = char:WaitForChild("Humanoid", 10)
@@ -6224,9 +6209,6 @@ BypassAnticheat = {
             end
         end
 
-        ---------------------------------------------------------------
-        -- SPEED BYPASS
-        ---------------------------------------------------------------
         local function startSpeedBypass()
             installSpeedHooks()
 
@@ -6283,9 +6265,6 @@ BypassAnticheat = {
             data.Collision = nil
         end
 
-        ---------------------------------------------------------------
-        -- RESTAURAÇÃO
-        ---------------------------------------------------------------
         local function restoreCollision()
             for part, originalValue in pairs(data.OriginalCollision) do
                 if part and part.Parent then
@@ -6308,9 +6287,6 @@ BypassAnticheat = {
             data.OriginalAutoRotate = nil
         end
 
-        ---------------------------------------------------------------
-        -- BODY VELOCITY (método Abysall)
-        ---------------------------------------------------------------
         local function ensureManipulateBody()
             if not data.ManipulateBody then
                 local bv = Instance.new("BodyVelocity")
@@ -6322,9 +6298,6 @@ BypassAnticheat = {
             return data.ManipulateBody
         end
 
-        ---------------------------------------------------------------
-        -- NOCLIP + MOVE FORWARD COM V
-        ---------------------------------------------------------------
         local function disableNoclip()
             data.IsHoldingV = false
 
@@ -6386,9 +6359,6 @@ BypassAnticheat = {
             bodyVel.Velocity = look * MANIPULATE_SPEED
         end
 
-        ---------------------------------------------------------------
-        -- INPUT HANDLERS
-        ---------------------------------------------------------------
         local function startNoclip()
             if not data.ConnInputBegan then
                 data.ConnInputBegan = UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -6441,9 +6411,6 @@ BypassAnticheat = {
             end
         end
 
-        ---------------------------------------------------------------
-        -- TOGGLE ON/OFF
-        ---------------------------------------------------------------
         local player    = game.Players.LocalPlayer
         local character = player.Character or player.CharacterAdded:Wait()
 
@@ -6463,18 +6430,13 @@ BypassAnticheat = {
             character:SetAttribute("CanJump",  Value)
             character:SetAttribute("CanSlide", Value)
 
-            -- 1) Para noclip e restaura colisão/movimento
             stopNoclip()
 
-            -- 2) Remove os hooks de metamethod ANTES de mandar o Crouch false,
-            --    senão o hook reescreveria para (true, true)
             stopSpeedBypass()
 
-            -- 3) Reseta o estado de crouch
             data.accum          = 0
             data.LastCrouchFire = 0
 
-            -- 4) Agora sim: dispara o Crouch como false para o servidor
             if CrouchRemote then
                 pcall(function()
                     CrouchRemote:FireServer(false)
@@ -6495,35 +6457,53 @@ AntiDieSystem = {
         local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
         local LocalPlayer = Players.LocalPlayer
-        local MainUI = LocalPlayer.PlayerGui:FindFirstChild("MainUI")
+        local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui", 30)
+        local MainUI      = PlayerGui and PlayerGui:WaitForChild("MainUI", 30)
 
         local RemotesFolder = ReplicatedStorage:FindFirstChild("RemotesFolder")
             or ReplicatedStorage:FindFirstChild("EntityInfo")
             or ReplicatedStorage:FindFirstChild("Bricks")
 
-        local GameData   = ReplicatedStorage:FindFirstChild("GameData")
-        local Floor      = (GameData and GameData:FindFirstChild("Floor") and GameData.Floor.Value) or "Hotel"
-        local LatestRoom = GameData and GameData:FindFirstChild("LatestRoom")
+        local GameData     = ReplicatedStorage:FindFirstChild("GameData")
+        local CurrentRooms = Workspace:FindFirstChild("CurrentRooms")
+        local Floor        = (GameData and GameData:FindFirstChild("Floor") and GameData.Floor.Value) or "Hotel"
+        local LatestRoom   = GameData and GameData:FindFirstChild("LatestRoom")
 
         if Floor == "Hotel" and RemotesFolder and RemotesFolder.Name == "Bricks" then
             Floor = "OldHotel"
         end
 
+        local IsLegacyFloor = (Floor == "Fools" or Floor == "OldHotel")
+
+        local CONFIG = {
+            EnablePositionSpoof = true,
+            AutoBreakerBox      = true,
+            AutoSolveAnchors    = true,
+            AutoUnlockPadlock   = true,
+            AutoUnlockDistance  = 50,
+            GuessLibraryCode    = true,
+            GuessCodeInterval   = 1.5,
+        }
+
         getgenv().AntiDieData = getgenv().AntiDieData or {
-            Connections = {},
-            FakeEvents  = {},
-            Modules     = {},
-            SavedProps  = {},
-            Character   = nil,
-            Humanoid    = nil,
-            RootPart    = nil,
-            Collision   = nil,
-            CollisionPart = nil,
-            CollisionClone = nil,
+            Connections        = {},
+            FakeEvents         = {},
+            Modules            = {},
+            SavedProps         = {},
+            Character          = nil,
+            Humanoid           = nil,
+            RootPart           = nil,
+            Collision          = nil,
+            CollisionPart      = nil,
+            CollisionClone     = nil,
             CollisionPartClone = nil,
-            OriginalC1 = nil,
-            OriginalHipHeight = nil,
-            CharacterConn = nil,
+            OriginalC1         = nil,
+            OriginalHipHeight  = nil,
+            CharacterConn      = nil,
+            UsedRandomCodes    = {},
+            BreakerNotified    = false,
+            BreakerInteracted  = false,
+            LastGuessTime      = 0,
         }
         local Data = getgenv().AntiDieData
 
@@ -6552,6 +6532,52 @@ AntiDieSystem = {
                 if obj.Name == name then table.insert(out, obj) end
             end
             return out
+        end
+
+        local function GetLibraryCode()
+            local char = LocalPlayer.Character
+            if not char then return nil end
+
+            local Paper = char:FindFirstChild("LibraryHintPaper")
+                or char:FindFirstChild("LibraryHintPaperHard")
+                or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("LibraryHintPaper"))
+                or (LocalPlayer.Backpack and LocalPlayer.Backpack:FindFirstChild("LibraryHintPaperHard"))
+
+            local CodeLength = (Floor == "Fools") and 10 or 5
+            local Code = {}
+            for i = 1, CodeLength do Code[i] = "_" end
+
+            if Paper and Paper:FindFirstChild("UI") then
+                local PermUI = PlayerGui:FindFirstChild("PermUI")
+                local Hints  = PermUI and PermUI:FindFirstChild("Hints")
+                if Hints then
+                    local HintChildren = Hints:GetChildren()
+                    local UIChildren   = Paper.UI:GetChildren()
+                    for _, Hint in ipairs(HintChildren) do
+                        for _, UIChild in ipairs(UIChildren) do
+                            if Hint:IsA("ImageLabel") and UIChild:IsA("ImageLabel")
+                                and Hint.ImageRectOffset == UIChild.ImageRectOffset
+                                and Code[tonumber(UIChild.Name)]
+                            then
+                                Code[tonumber(UIChild.Name)] = Hint.TextLabel.Text
+                            end
+                        end
+                    end
+                end
+            end
+            return table.concat(Code)
+        end
+
+        local function GetRandomCode()
+            local Template = GetLibraryCode()
+            if not Template then return nil end
+            local NewCode, Tries = nil, 0
+            repeat
+                NewCode = Template:gsub("_", function() return tostring(math.random(0, 9)) end)
+                Tries = Tries + 1
+            until not Data.UsedRandomCodes[NewCode] or Tries >= 10
+            Data.UsedRandomCodes[NewCode] = true
+            return NewCode
         end
 
         if not state then
@@ -6627,17 +6653,18 @@ AntiDieSystem = {
             if Data.CollisionClone     then pcall(function() Data.CollisionClone:Destroy() end)     end
             if Data.CollisionPartClone then pcall(function() Data.CollisionPartClone:Destroy() end) end
 
-            Data.Character = nil
-            Data.Humanoid = nil
-            Data.RootPart = nil
-            Data.Collision = nil
-            Data.CollisionPart = nil
-            Data.CollisionClone = nil
-            Data.CollisionPartClone = nil
-            Data.OriginalC1 = nil
+            Data.Character         = nil
+            Data.Humanoid          = nil
+            Data.RootPart          = nil
+            Data.Collision         = nil
+            Data.CollisionPart     = nil
+            Data.CollisionClone    = nil
+            Data.CollisionPartClone= nil
+            Data.OriginalC1        = nil
             Data.OriginalHipHeight = nil
-
-                        return
+            Data.BreakerNotified   = false
+            Data.BreakerInteracted = false
+            return
         end
 
         DisconnectAll()
@@ -6646,9 +6673,9 @@ AntiDieSystem = {
             if not getgenv().AntiDieData then return end
             if not NewChar or not NewChar.Parent then return end
 
-            local hum   = NewChar:WaitForChild("Humanoid", 30)
-            local root  = NewChar:WaitForChild("HumanoidRootPart", 30)
-            local col   = NewChar:WaitForChild("Collision", 30)
+            local hum  = NewChar:WaitForChild("Humanoid", 30)
+            local root = NewChar:WaitForChild("HumanoidRootPart", 30)
+            local col  = NewChar:WaitForChild("Collision", 30)
             if not hum or not root or not col then return end
 
             local colPart = NewChar:FindFirstChild("CollisionPart") or col
@@ -6678,19 +6705,20 @@ AntiDieSystem = {
                 originalC1 = NewChar.LowerTorso.Root.C1
             end
 
-            Data.Character = NewChar
-            Data.Humanoid  = hum
-            Data.RootPart  = root
-            Data.Collision = col
-            Data.CollisionPart = colPart
-            Data.CollisionClone = colClone
+            Data.Character          = NewChar
+            Data.Humanoid           = hum
+            Data.RootPart           = root
+            Data.Collision          = col
+            Data.CollisionPart      = colPart
+            Data.CollisionClone     = colClone
             Data.CollisionPartClone = colPartClone
-            Data.OriginalC1 = originalC1
-            Data.OriginalHipHeight = hum.HipHeight
+            Data.OriginalC1         = originalC1
+            Data.OriginalHipHeight  = hum.HipHeight
 
-            if Floor ~= "Fools" and Floor ~= "OldHotel" then
+            if not IsLegacyFloor and CONFIG.EnablePositionSpoof then
                 task.wait(1)
                 if not getgenv().AntiDieData or Data.Character ~= NewChar then return end
+                if not root or not root.Parent then return end
                 root.CFrame = root.CFrame * CFrame.new(0, -2.346, 0)
                 hum.HipHeight = 0.05
 
@@ -6715,15 +6743,58 @@ AntiDieSystem = {
             local hum  = Data.Humanoid
             local root = Data.RootPart
             local col  = Data.Collision
-            local colPart  = Data.CollisionPart
-            local colClone = Data.CollisionClone
+            local colPart      = Data.CollisionPart
+            local colClone     = Data.CollisionClone
             local colPartClone = Data.CollisionPartClone
 
             if not char or not char.Parent then return end
-            if not hum or not hum.Parent then return end
+            if not hum  or not hum.Parent  then return end
             if not root or not root.Parent then return end
-            if not col or not col.Parent then return end
+            if not col  or not col.Parent  then return end
             if not colClone or not colClone.Parent then return end
+
+            if IsLegacyFloor then
+
+                local SpoofOffset = 0
+                for _, ent in ipairs(Workspace:GetChildren()) do
+                    if ent.Name == "RushMoving" or ent.Name == "AmbushMoving"
+                       or ent.Name == "FigureRig" or ent.Name == "Figure"
+                       or ent.Name == "FigureRagdoll" or ent.Name == "A60"
+                       or ent.Name == "A120" or ent.Name == "BackdoorRush" then
+                        local pp = ent.PrimaryPart or ent:FindFirstChild("HumanoidRootPart")
+                        if pp and (root.Position - pp.Position).Magnitude < 60 then
+                            SpoofOffset = 200
+                            break
+                        end
+                    end
+                end
+
+                col.Position = root.Position + Vector3.new(0, SpoofOffset, 0)
+                col.CanCollide = false
+
+                if col:FindFirstChild("CollisionCrouch") then
+                    col.CollisionCrouch.CanCollide = false
+                end
+                if colClone:FindFirstChild("CollisionCrouch") then
+                    colClone.CollisionCrouch.CanCollide = false
+                end
+
+                colClone.CollisionGroup = col.CollisionGroup
+                colClone.Position = root.Position + Vector3.new(0, SpoofOffset, 0)
+
+                root.CanCollide = false
+                for _, part in ipairs(char:GetChildren()) do
+                    if part:IsA("BasePart")
+                        and part ~= col and part ~= colPart
+                        and part ~= colClone and part ~= colPartClone
+                    then
+                        part.CanCollide = false
+                    end
+                end
+                colClone.CanCollide = true
+                if colPartClone then colPartClone.CanCollide = false end
+                return
+            end
 
             if Data.OriginalC1 and char:FindFirstChild("LowerTorso")
                 and char.LowerTorso:FindFirstChild("Root")
@@ -6731,40 +6802,41 @@ AntiDieSystem = {
                 char.LowerTorso.Root.C1 = Data.OriginalC1 * CFrame.new(0, -2.346, 0)
             end
 
-            col.Position = root.Position + Vector3.new(0, 2.328, 0)
+            local SpoofY = CONFIG.EnablePositionSpoof and 2.328 or 0.18
+
+            col.Position = root.Position + Vector3.new(0, SpoofY, 0)
             if colPart and colPart.Parent and colPart ~= col then
-                colPart.Position = root.Position + Vector3.new(0, 2.328, 0)
+                colPart.Position = root.Position + Vector3.new(0, SpoofY, 0)
             end
 
             if col:FindFirstChild("CollisionCrouch") and colClone:FindFirstChild("CollisionCrouch") then
-                col.CollisionCrouch.Position = root.Position + Vector3.new(0, 1.328, 0)
+                local CrouchY = CONFIG.EnablePositionSpoof and 1.328 or -0.982
+                col.CollisionCrouch.Position = root.Position + Vector3.new(0, CrouchY, 0)
                 colClone.CollisionCrouch.CollisionGroup = col.CollisionCrouch.CollisionGroup
             end
             if colClone:FindFirstChild("CollisionCrouch") then
-                colClone.CollisionCrouch.Position = root.Position + Vector3.new(0, 0.75, 0)
+                local CrouchY2 = CONFIG.EnablePositionSpoof and 0.75 or -0.982
+                colClone.CollisionCrouch.Position = root.Position + Vector3.new(0, CrouchY2, 0)
             end
 
             colClone.CollisionGroup = col.CollisionGroup
-            colClone.Position       = root.Position + Vector3.new(0, 1.75, 0)
+            colClone.Position = root.Position + Vector3.new(0, CONFIG.EnablePositionSpoof and 1.75 or 0.18, 0)
 
-            if hum.HipHeight ~= 0.05 then
+            if CONFIG.EnablePositionSpoof and hum.HipHeight ~= 0.05 then
                 hum.HipHeight = 0.05
             end
 
             root.CanCollide = false
             for _, part in ipairs(char:GetChildren()) do
                 if part:IsA("BasePart")
-                    and part ~= col
-                    and part ~= colPart
-                    and part ~= colClone
-                    and part ~= colPartClone
+                    and part ~= col and part ~= colPart
+                    and part ~= colClone and part ~= colPartClone
                 then
                     part.CanCollide = false
                 end
             end
             colClone.CanCollide = true
             if colPartClone then colPartClone.CanCollide = false end
-
         end))
 
         local UIModules
@@ -6798,13 +6870,13 @@ AntiDieSystem = {
         Register(ModVoid,    "Void")
         Register(ModSpider,  "SpiderJumpscare")
 
-        if ModScreech then ModScreech.Name = "Screech_Disabled" end
-        if ModA90     then ModA90.Name     = "A90_Disabled"     end
-        if ModDread   then ModDread.Name   = "Dread_Disabled"   end
-        if ModShade   then ModShade.Name   = "Shade_Disabled"   end
-        if ModGlitch  then ModGlitch.Name  = "Glitch_Disabled"  end
-        if ModVoid    then ModVoid.Name    = "Void_Disabled"    end
-        if ModSpider  then ModSpider.Name  = "SpiderJumpscare_Disabled" end
+        if ModScreech then ModScreech.Name = "Screech_Disabled"          end
+        if ModA90     then ModA90.Name     = "A90_Disabled"              end
+        if ModDread   then ModDread.Name   = "Dread_Disabled"            end
+        if ModShade   then ModShade.Name   = "Shade_Disabled"            end
+        if ModGlitch  then ModGlitch.Name  = "Glitch_Disabled"           end
+        if ModVoid    then ModVoid.Name    = "Void_Disabled"             end
+        if ModSpider  then ModSpider.Name  = "SpiderJumpscare_Disabled"  end
 
         if MainUI and MainUI:FindFirstChild("MainFrame") then
             local surge = MainUI.MainFrame:FindFirstChild("SurgeVignette")
@@ -6864,6 +6936,7 @@ AntiDieSystem = {
                 end
             end
         end
+
         for _, obj in ipairs(GetAll("SeekFloodline")) do
             SaveThenSet(obj, "CanCollide", true)
         end
@@ -6990,7 +7063,7 @@ AntiDieSystem = {
             local isLookman = Workspace:FindFirstChild("BackdoorLookman")
 
             if isEyes or isLookman then
-                if Floor == "Fools" or Floor == "OldHotel" then
+                if IsLegacyFloor then
                     pcall(function() mr:FireServer(0, -65, 0, false) end)
                 else
                     pcall(function() mr:FireServer(-650) end)
@@ -6998,7 +7071,103 @@ AntiDieSystem = {
             end
         end))
 
-            end,
+        Data.BreakerNotified   = false
+        Data.BreakerInteracted = false
+
+        AddConn(Workspace.DescendantAdded:Connect(function(obj)
+            if obj.Name ~= "ElevatorBreaker" then return end
+            if not CONFIG.AutoBreakerBox then return end
+
+            task.spawn(function()
+                if not Data.BreakerNotified then
+                    Data.BreakerNotified = true
+                                    end
+
+                local sg = obj:WaitForChild("SurfaceGui", 10)
+                if not sg then return end
+                local frame = sg:WaitForChild("Frame", 5)
+                if not frame then return end
+                local codeLabel = frame:WaitForChild("Code", 5)
+                if not codeLabel then return end
+
+                Data.BreakerInteracted = true
+                codeLabel:GetPropertyChangedSignal("Text"):Connect(function()
+                    if not getgenv().AntiDieData then return end
+                    if not CONFIG.AutoBreakerBox then return end
+                    pcall(function() RemotesFolder.EBF:FireServer() end)
+                end)
+            end)
+        end))
+
+        AddConn(RunService.Heartbeat:Connect(function()
+            if not CONFIG.AutoSolveAnchors then return end
+            if not MainUI then return end
+            local anchorFrame = MainUI:FindFirstChild("AnchorHintFrame")
+            if not anchorFrame then return end
+            local codeLabel = anchorFrame:FindFirstChild("Code")
+            if not codeLabel then return end
+
+            local code = codeLabel.Text
+            if not code or code == "" then return end
+
+            local root = Data.RootPart
+            if not root then return end
+
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj.Name == "MinesAnchor" and obj:FindFirstChild("Sign") then
+                    local sign = obj.Sign
+                    local textLabel = sign:FindFirstChild("TextLabel")
+                    if textLabel and textLabel.Text == code then
+                        local prompt = obj:FindFirstChild("ActivateEventPrompt", true)
+                        local remote  = obj:FindFirstChild("AnchorRemote", true)
+                        if remote and not obj:GetAttribute("Activated") then
+                            local dist = (root.Position - obj:GetPivot().Position).Magnitude
+                            if dist < 15 then
+                                pcall(function()
+                                    remote:InvokeServer(code)
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+        end))
+
+        AddConn(RunService.Heartbeat:Connect(function()
+            if not getgenv().AntiDieData then return end
+            if not RemotesFolder then return end
+            local plRemote = RemotesFolder:FindFirstChild("PL")
+            if not plRemote then return end
+
+            local root = Data.RootPart
+            if not root then return end
+
+            local padlock = Workspace:FindFirstChild("Padlock", true)
+            if not padlock or not padlock.PrimaryPart then return end
+
+            local dist = (root.Position - padlock.PrimaryPart.Position).Magnitude
+
+            if CONFIG.AutoUnlockPadlock and dist <= CONFIG.AutoUnlockDistance then
+                local code = GetLibraryCode()
+                if code and not code:find("_") and tonumber(code) then
+                    pcall(function() plRemote:FireServer(code) end)
+                end
+            end
+
+            if CONFIG.GuessLibraryCode then
+                if tick() - Data.LastGuessTime >= CONFIG.GuessCodeInterval then
+                    Data.LastGuessTime = tick()
+                    if dist <= CONFIG.AutoUnlockDistance then
+                        local rnd = GetRandomCode()
+                        if rnd then
+                            pcall(function() plRemote:FireServer(rnd) end)
+                        end
+                    end
+                end
+            end
+        end))
+
+    end,
 },
 }
 -- FIM DA SEÇÃO DE BOTÕES ↑↑↑
